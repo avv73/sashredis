@@ -2,22 +2,27 @@ package main
 
 import (
 	"fmt"
-	"net"
-	"os"
+
+	log "github.com/sirupsen/logrus"
+
+	"github.com/codecrafters-io/redis-starter-go/app/command"
+	"github.com/codecrafters-io/redis-starter-go/app/handler"
+	"github.com/codecrafters-io/redis-starter-go/app/network"
 )
 
 func main() {
-	// You can use print statements as follows for debugging, they'll be visible when running tests.
-	fmt.Println("Logs from your program will appear here!")
+	fmt.Println("===SASHKO REDIS===")
 
-	l, err := net.Listen("tcp", "0.0.0.0:6379")
+	pingHandler := handler.NewPingHandler()
+
+	router := network.NewRequestRouter(map[command.CommandName]network.CommandHandler{
+		command.Ping: pingHandler,
+	})
+
+	listener := network.NewTCPListener("6379", router)
+
+	err := listener.StartListen()
 	if err != nil {
-		fmt.Println("Failed to bind to port 6379")
-		os.Exit(1)
-	}
-	_, err = l.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
+		log.WithError(err).Errorln("Failed to start listening")
 	}
 }
