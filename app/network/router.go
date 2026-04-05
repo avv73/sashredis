@@ -34,6 +34,8 @@ func (r *RequestRouter) HandleConnection(connection net.Conn) error {
 		return fmt.Errorf("connection read: %w", err)
 	}
 
+	log.Infof("got message: %s", message)
+
 	command := r.parseCommand(message)
 	result, err := r.route(command)
 
@@ -50,7 +52,10 @@ func (r *RequestRouter) parseCommand(message string) *command.Command {
 	messageTokens := strings.Split(message, " ")
 
 	msgCommand := messageTokens[0]
-	args := messageTokens[1:]
+	var args []string
+	if len(messageTokens) > 0 {
+		args = messageTokens[1:]
+	}
 
 	return &command.Command{
 		Command: command.CommandName(msgCommand),
