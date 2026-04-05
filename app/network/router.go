@@ -64,6 +64,7 @@ func (r *RequestRouter) route(command *command.Command) (string, error) {
 		return "", fmt.Errorf("command not registered: %s", command)
 	}
 
+	log.Infoln("handling command")
 	result, err := handler.HandleCommand(command)
 	if err != nil {
 		return "", fmt.Errorf("command execution error: %w", err)
