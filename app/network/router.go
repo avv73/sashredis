@@ -26,8 +26,15 @@ func NewRequestRouter(handlers map[command.CommandName]CommandHandler) *RequestR
 	}
 }
 
+func (r *RequestRouter) hardcodePing(connection net.Conn) error {
+	_, err := connection.Write([]byte("+PONG\r\n"))
+	return err
+}
+
 func (r *RequestRouter) HandleConnection(connection net.Conn) error {
 	defer connection.Close()
+	return r.hardcodePing(connection)
+
 	reader := bufio.NewReader(connection)
 	message, err := reader.ReadString('\n')
 	if err != nil {
