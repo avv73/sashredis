@@ -3,7 +3,7 @@ package command
 type CommandName string
 
 const (
-	Ping CommandName = "PING"
+	Ping CommandName = "*1\r\n"
 )
 
 type Command struct {
