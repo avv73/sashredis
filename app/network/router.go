@@ -7,6 +7,8 @@ import (
 	"net"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/codecrafters-io/redis-starter-go/app/command"
 )
 
@@ -67,5 +69,6 @@ func (r *RequestRouter) route(command *command.Command) (string, error) {
 		return "", fmt.Errorf("command execution error: %w", err)
 	}
 
+	log.Infof("route result: %s", result)
 	return result, nil
 }
