@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	log "github.com/sirupsen/logrus"
 
 	"github.com/codecrafters-io/redis-starter-go/app/command"
@@ -11,7 +9,7 @@ import (
 )
 
 func main() {
-	fmt.Println("===SASHKO REDIS===")
+	log.Println("===SASHKO REDIS===")
 
 	pingHandler := handler.NewPingHandler()
 
