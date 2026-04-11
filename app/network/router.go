@@ -40,7 +40,7 @@ func NewRequestRouter(handlers map[types.CommandName]CommandHandler, parser Comm
 func (r *RequestRouter) HandleConnection(connection net.Conn) error {
 	//defer connection.Close()
 	reader := bufio.NewReader(connection)
-	var message []byte
+	message := make([]byte, 1024)
 	n, err := reader.Read(message)
 	if err != nil {
 		log.Errorf("failed to read conn: %s", err.Error())
