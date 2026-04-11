@@ -34,7 +34,7 @@ func (p *Parser) ParseCommand(chunk []byte) (*types.Command, error) {
 	}
 
 	return &types.Command{
-		Command: types.CommandName(array[0].Data),
+		Command: types.CommandName(strings.ToUpper(array[0].Data)),
 		Args:    args,
 	}, nil
 }

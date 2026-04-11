@@ -44,13 +44,9 @@ func (r *RequestRouter) HandleConnection(connection net.Conn) error {
 	for {
 		n, err := reader.Read(message)
 		if err != nil {
-			log.Errorf("failed to read conn: %s", err.Error())
 			return fmt.Errorf("connection read: %w", err)
 		}
-		if n > 10000 {
-			log.Warnf("large input ahead")
-		}
-
+		message = message[:n]
 		log.Infof("got message: %s", message)
 
 		command, err := r.parser.ParseCommand(message)
@@ -73,8 +69,6 @@ func (r *RequestRouter) HandleConnection(connection net.Conn) error {
 			return fmt.Errorf("connection write: %w", err)
 		}
 	}
-
-	return nil
 }
 
 func (r *RequestRouter) route(command *types.Command) (*types.RedisData, error) {
