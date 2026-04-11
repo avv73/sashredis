@@ -42,6 +42,7 @@ func (r *RequestRouter) HandleConnection(connection net.Conn) error {
 	defer connection.Close()
 
 	reader := bufio.NewReader(connection)
+	log.Infof("handle conn")
 	message, err := io.ReadAll(reader)
 	if err != nil {
 		return fmt.Errorf("connection read: %w", err)
