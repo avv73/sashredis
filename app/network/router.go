@@ -1,7 +1,6 @@
 package network
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"maps"
@@ -41,8 +40,8 @@ func NewRequestRouter(handlers map[types.CommandName]CommandHandler, parser Comm
 func (r *RequestRouter) HandleConnection(connection net.Conn) error {
 	defer connection.Close()
 
-	reader := bufio.NewReader(connection)
-	message, err := io.ReadAll(reader)
+	//reader := bufio.NewReader(connection)
+	message, err := io.ReadAll(connection)
 	if err != nil {
 		log.Errorf("failed to read conn: %s", err.Error())
 		return fmt.Errorf("connection read: %w", err)
