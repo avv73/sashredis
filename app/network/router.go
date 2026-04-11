@@ -38,7 +38,12 @@ func NewRequestRouter(handlers map[types.CommandName]CommandHandler, parser Comm
 }
 
 func (r *RequestRouter) HandleConnection(connection net.Conn) error {
-	defer connection.Close()
+	//defer connection.Close()
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorln("Recovered. Error:\n", r)
+		}
+	}()
 
 	//reader := bufio.NewReader(connection)
 	message, err := io.ReadAll(connection)

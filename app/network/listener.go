@@ -33,12 +33,6 @@ func (t *TCPListener) StartListen() error {
 		return errors.New("failed to bind tcp to port 6379")
 	}
 
-	defer func() {
-		if r := recover(); r != nil {
-			log.Errorln("Recovered. Error:\n", r)
-		}
-	}()
-
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -48,6 +42,7 @@ func (t *TCPListener) StartListen() error {
 
 		log.Info("accepting a new connection!")
 		err = t.handler.HandleConnection(conn)
+		conn.Close()
 		log.Info("finished accepting")
 		if err != nil {
 			log.WithError(err).Errorln("Error while handling connection")
