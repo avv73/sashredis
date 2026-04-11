@@ -3,50 +3,68 @@ package network
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"maps"
 	"net"
-	"strings"
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/codecrafters-io/redis-starter-go/app/command"
+	"github.com/codecrafters-io/redis-starter-go/app/types"
 )
 
 type CommandHandler interface {
-	HandleCommand(command *command.Command) (string, error)
+	HandleCommand(command *types.Command) (*types.RedisData, error)
+}
+
+type CommandParser interface {
+	ParseCommand(chunk []byte) (*types.Command, error)
+}
+
+type ResultEncoder interface {
+	Encode(input *types.RedisData) ([]byte, error)
 }
 
 type RequestRouter struct {
-	handlers map[command.CommandName]CommandHandler
+	handlers map[types.CommandName]CommandHandler
+	parser   CommandParser
+	encoder  ResultEncoder
 }
 
-func NewRequestRouter(handlers map[command.CommandName]CommandHandler) *RequestRouter {
+func NewRequestRouter(handlers map[types.CommandName]CommandHandler, parser CommandParser, encoder ResultEncoder) *RequestRouter {
 	return &RequestRouter{
 		handlers: maps.Clone(handlers),
+		parser:   parser,
+		encoder:  encoder,
 	}
-}
-
-func (r *RequestRouter) hardcodePing(connection net.Conn) error {
-	_, err := connection.Write([]byte("+PONG\r\n"))
-	return err
 }
 
 func (r *RequestRouter) HandleConnection(connection net.Conn) error {
 	defer connection.Close()
-	return r.hardcodePing(connection)
 
 	reader := bufio.NewReader(connection)
-	message, err := reader.ReadString('\n')
+	message, err := io.ReadAll(reader)
 	if err != nil {
 		return fmt.Errorf("connection read: %w", err)
 	}
 
 	log.Infof("got message: %s", message)
 
-	command := r.parseCommand(message)
-	result, err := r.route(command)
+	command, err := r.parser.ParseCommand(message)
+	if err != nil {
+		return fmt.Errorf("failed parsing command: %w", err)
+	}
 
-	_, err = connection.Write([]byte(result))
+	result, err := r.route(command)
+	if err != nil {
+		return fmt.Errorf("exec error: %w", err)
+	}
+
+	encodedResult, err := r.encoder.Encode(result)
+	if err != nil {
+		return fmt.Errorf("encode error: %w", err)
+	}
+
+	_, err = connection.Write([]byte(encodedResult))
 	if err != nil {
 		return fmt.Errorf("connection write: %w", err)
 	}
@@ -54,32 +72,16 @@ func (r *RequestRouter) HandleConnection(connection net.Conn) error {
 	return nil
 }
 
-func (r *RequestRouter) parseCommand(message string) *command.Command {
-	message = strings.ToUpper(strings.TrimSpace(message))
-	messageTokens := strings.Split(message, " ")
-
-	msgCommand := messageTokens[0]
-	var args []string
-	if len(messageTokens) > 0 {
-		args = messageTokens[1:]
-	}
-
-	return &command.Command{
-		Command: command.CommandName(msgCommand),
-		Args:    args,
-	}
-}
-
-func (r *RequestRouter) route(command *command.Command) (string, error) {
+func (r *RequestRouter) route(command *types.Command) (*types.RedisData, error) {
 	handler, ok := r.handlers[command.Command]
 	if !ok {
-		return "", fmt.Errorf("command not registered: %s", command)
+		return nil, fmt.Errorf("command not registered: %s", string(command.Command))
 	}
 
 	log.Infoln("handling command")
 	result, err := handler.HandleCommand(command)
 	if err != nil {
-		return "", fmt.Errorf("command execution error: %w", err)
+		return nil, fmt.Errorf("command execution error: %w", err)
 	}
 
 	log.Infof("route result: %s", result)

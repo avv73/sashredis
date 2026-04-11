@@ -1,0 +1,63 @@
+package types
+
+import (
+	"fmt"
+	"strings"
+)
+
+type CommandName string
+
+const (
+	Ping CommandName = "PING"
+)
+
+type DataType int
+
+const (
+	Null DataType = iota
+	Integer
+	SString
+	BString
+	Array
+)
+
+func (d DataType) String() string {
+	switch d {
+	case Null:
+		return "Null"
+	case Integer:
+		return "Integer"
+	case SString:
+		return "SString"
+	case BString:
+		return "BString"
+	case Array:
+		return "Array"
+	}
+
+	return fmt.Sprintf("unknown:%d", d)
+}
+
+type Command struct {
+	Command CommandName
+	Args    []*RedisData
+}
+
+type RedisData struct {
+	Type  DataType
+	Data  string
+	Holds []*RedisData
+}
+
+func (r *RedisData) IsNil() bool {
+	return r == nil || r.Type == Null
+}
+
+func (r *RedisData) String() string {
+	var nested strings.Builder
+	if len(r.Holds) > 0 {
+		nested.WriteString(r.String())
+	}
+
+	return fmt.Sprintf("%s:<data: %s> holds: [%s]", r.Type.String(), r.Data, nested.String())
+}

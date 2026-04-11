@@ -3,9 +3,10 @@ package main
 import (
 	log "github.com/sirupsen/logrus"
 
-	"github.com/codecrafters-io/redis-starter-go/app/command"
 	"github.com/codecrafters-io/redis-starter-go/app/handler"
+	"github.com/codecrafters-io/redis-starter-go/app/marshal"
 	"github.com/codecrafters-io/redis-starter-go/app/network"
+	"github.com/codecrafters-io/redis-starter-go/app/types"
 )
 
 func main() {
@@ -13,9 +14,14 @@ func main() {
 
 	pingHandler := handler.NewPingHandler()
 
-	router := network.NewRequestRouter(map[command.CommandName]network.CommandHandler{
-		command.Ping: pingHandler,
-	})
+	handlers := map[types.CommandName]network.CommandHandler{
+		types.Ping: pingHandler,
+	}
+
+	parser := marshal.NewParser()
+	encoder := marshal.NewEncoder()
+
+	router := network.NewRequestRouter(handlers, parser, encoder)
 
 	listener := network.NewTCPListener("6379", router)
 
