@@ -40,10 +40,7 @@ func (t *TCPListener) StartListen() error {
 			continue
 		}
 
-		log.Info("accepting a new connection!")
 		err = t.handler.HandleConnection(conn)
-		conn.Close()
-		log.Info("finished accepting")
 		if err != nil {
 			log.WithError(err).Errorln("Error while handling connection")
 			continue

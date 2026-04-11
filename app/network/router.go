@@ -38,38 +38,40 @@ func NewRequestRouter(handlers map[types.CommandName]CommandHandler, parser Comm
 }
 
 func (r *RequestRouter) HandleConnection(connection net.Conn) error {
-	//defer connection.Close()
+	defer connection.Close()
 	reader := bufio.NewReader(connection)
 	message := make([]byte, 1024)
-	n, err := reader.Read(message)
-	if err != nil {
-		log.Errorf("failed to read conn: %s", err.Error())
-		return fmt.Errorf("connection read: %w", err)
-	}
-	if n > 10000 {
-		log.Warnf("large input ahead")
-	}
+	for {
+		n, err := reader.Read(message)
+		if err != nil {
+			log.Errorf("failed to read conn: %s", err.Error())
+			return fmt.Errorf("connection read: %w", err)
+		}
+		if n > 10000 {
+			log.Warnf("large input ahead")
+		}
 
-	log.Infof("got message: %s", message)
+		log.Infof("got message: %s", message)
 
-	command, err := r.parser.ParseCommand(message)
-	if err != nil {
-		return fmt.Errorf("failed parsing command: %w", err)
-	}
+		command, err := r.parser.ParseCommand(message)
+		if err != nil {
+			return fmt.Errorf("failed parsing command: %w", err)
+		}
 
-	result, err := r.route(command)
-	if err != nil {
-		return fmt.Errorf("exec error: %w", err)
-	}
+		result, err := r.route(command)
+		if err != nil {
+			return fmt.Errorf("exec error: %w", err)
+		}
 
-	encodedResult, err := r.encoder.Encode(result)
-	if err != nil {
-		return fmt.Errorf("encode error: %w", err)
-	}
+		encodedResult, err := r.encoder.Encode(result)
+		if err != nil {
+			return fmt.Errorf("encode error: %w", err)
+		}
 
-	_, err = connection.Write([]byte(encodedResult))
-	if err != nil {
-		return fmt.Errorf("connection write: %w", err)
+		_, err = connection.Write([]byte(encodedResult))
+		if err != nil {
+			return fmt.Errorf("connection write: %w", err)
+		}
 	}
 
 	return nil
