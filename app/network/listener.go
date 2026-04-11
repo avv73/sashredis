@@ -2,7 +2,6 @@ package network
 
 import (
 	"errors"
-	"fmt"
 	"net"
 
 	log "github.com/sirupsen/logrus"
@@ -36,7 +35,7 @@ func (t *TCPListener) StartListen() error {
 
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("Recovered. Error:\n", r)
+			log.Errorln("Recovered. Error:\n", r)
 		}
 	}()
 
