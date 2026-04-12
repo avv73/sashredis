@@ -19,6 +19,7 @@ const (
 	SString
 	BString
 	Array
+	Error
 )
 
 func (d DataType) String() string {
@@ -33,6 +34,8 @@ func (d DataType) String() string {
 		return "BString"
 	case Array:
 		return "Array"
+	case Error:
+		return "Error"
 	}
 
 	return fmt.Sprintf("unknown:%d", d)

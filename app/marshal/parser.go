@@ -23,7 +23,7 @@ func (p *Parser) ParseCommand(chunk []byte) (*types.Command, error) {
 		return nil, fmt.Errorf("parse command: %w", err)
 	}
 
-	commandName := array[0]
+	commandName := array[0] // TODO: Are we sure about this? What if client sends out 2 batched commands?
 	if commandName.Type != types.SString && commandName.Type != types.BString {
 		return nil, fmt.Errorf("expected command name to be SString, but got: %d", commandName.Type)
 	}
