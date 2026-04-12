@@ -19,10 +19,13 @@ func main() {
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
+
 	pingHandler := handler.NewPingHandler()
+	echoHandler := handler.NewEchoHandler()
 
 	handlers := map[types.CommandName]processor.CommandHandler{
 		types.Ping: pingHandler,
+		types.Echo: echoHandler,
 	}
 
 	parser := marshal.NewParser()
