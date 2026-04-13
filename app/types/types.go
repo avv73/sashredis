@@ -10,6 +10,8 @@ type CommandName string
 const (
 	Ping CommandName = "PING"
 	Echo CommandName = "ECHO"
+	Set  CommandName = "SET"
+	Get  CommandName = "GET"
 )
 
 type DataType int

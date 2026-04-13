@@ -16,7 +16,7 @@ type RequestHandler interface {
 }
 
 type TCPListener struct {
-	port    string
+	port    int
 	handler RequestHandler
 }
 
@@ -24,7 +24,7 @@ type ConnectionListener interface {
 	StartListen(ctx context.Context) error
 }
 
-func NewTCPListener(port string, handler RequestHandler) ConnectionListener {
+func NewTCPListener(port int, handler RequestHandler) ConnectionListener {
 	return &TCPListener{
 		port:    port,
 		handler: handler,
@@ -32,7 +32,7 @@ func NewTCPListener(port string, handler RequestHandler) ConnectionListener {
 }
 
 func (t *TCPListener) StartListen(ctx context.Context) error {
-	l, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", config.GetConfig().Port))
+	l, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", t.port))
 	if err != nil {
 		return errors.New("failed to bind tcp to port 6379")
 	}
