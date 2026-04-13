@@ -14,7 +14,7 @@ type EventBusPublisher interface {
 }
 
 type CommandHandler interface {
-	HandleCommand(command *types.Command) (*types.RedisData, error)
+	HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error)
 }
 
 type Processor struct {
@@ -39,19 +39,19 @@ func (p *Processor) Start(ctx context.Context) {
 				return
 			}
 
-			result, err := p.executeCommand(command)
+			result, err := p.executeCommand(ctx, command)
 			callback(result, err)
 		}
 	}()
 }
 
-func (p *Processor) executeCommand(command *types.Command) (*types.RedisData, error) {
+func (p *Processor) executeCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
 	handler, ok := p.handlers[command.Command]
 	if !ok {
 		return nil, fmt.Errorf("command not registered: %s", string(command.Command))
 	}
 
-	result, err := handler.HandleCommand(command)
+	result, err := handler.HandleCommand(ctx, command)
 	if err != nil {
 		return nil, fmt.Errorf("command execution error: %w", err)
 	}

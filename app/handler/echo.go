@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 
 	"github.com/codecrafters-io/redis-starter-go/app/types"
@@ -13,7 +14,7 @@ func NewEchoHandler() *EchoHandler {
 	return &EchoHandler{}
 }
 
-func (*EchoHandler) HandleCommand(command *types.Command) (*types.RedisData, error) {
+func (*EchoHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
 	if len(command.Args) != 1 {
 		return nil, errors.New("unexpected number of arguments")
 	}

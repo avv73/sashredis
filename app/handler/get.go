@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 
 	"github.com/codecrafters-io/redis-starter-go/app/types"
@@ -20,7 +21,7 @@ func NewGetHandler(storage GetterStorage) *GetHandler {
 	}
 }
 
-func (s *GetHandler) HandleCommand(command *types.Command) (*types.RedisData, error) {
+func (s *GetHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
 	if len(command.Args) != 1 {
 		return nil, errors.New("unexpected number of arguments")
 	}
