@@ -17,7 +17,7 @@ type Storage struct {
 
 type StorageBucket struct {
 	Data        *types.RedisData
-	MsExp       int
+	MsExp       *int
 	LastWritten time.Time
 }
 
@@ -53,7 +53,7 @@ func (s *Storage) SetKvp(ctx context.Context, key string, data *types.RedisData,
 	}
 
 	if option.MsExpiration != nil {
-		storageBucket.MsExp = *option.MsExpiration
+		storageBucket.MsExp = option.MsExpiration
 		go s.scheduleDeletion(ctx, key, storageBucket)
 	}
 
@@ -68,7 +68,7 @@ func (s *Storage) GetKvp(key string) (*types.RedisData, bool) {
 	if !ok {
 		return nil, false
 	}
-	if result.LastWritten.Add(time.Millisecond * time.Duration(result.MsExp)).Before(time.Now()) {
+	if result.MsExp != nil && result.LastWritten.Add(time.Millisecond*time.Duration(*result.MsExp)).Before(time.Now()) {
 		delete(s.kvpStore, key)
 		return nil, false
 	}
@@ -77,7 +77,7 @@ func (s *Storage) GetKvp(key string) (*types.RedisData, bool) {
 }
 
 func (s *Storage) scheduleDeletion(ctx context.Context, key string, bucket StorageBucket) {
-	timer := time.NewTimer(time.Millisecond * time.Duration(bucket.MsExp))
+	timer := time.NewTimer(time.Millisecond * time.Duration(*bucket.MsExp))
 	log.Infof("logged for deletion - %s", key)
 	select {
 	case <-ctx.Done():
