@@ -23,16 +23,19 @@ func NewRpushHandler(storage ListStorage) *RpushHandler {
 }
 
 func (r *RpushHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
-	if len(command.Args) != 2 {
+	if len(command.Args) < 2 {
 		return nil, errors.New("unexpected number of arguments")
 	}
 
 	key := command.Args[0]
-	value := command.Args[1]
+	var result int
+	var err error
 
-	result, err := r.storage.AppendToList(key.Data, value)
-	if err != nil {
-		return nil, err
+	for _, value := range command.Args[1:] {
+		result, err = r.storage.AppendToList(key.Data, value)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &types.RedisData{
