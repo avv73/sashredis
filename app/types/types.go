@@ -8,10 +8,11 @@ import (
 type CommandName string
 
 const (
-	Ping CommandName = "PING"
-	Echo CommandName = "ECHO"
-	Set  CommandName = "SET"
-	Get  CommandName = "GET"
+	Ping  CommandName = "PING"
+	Echo  CommandName = "ECHO"
+	Set   CommandName = "SET"
+	Get   CommandName = "GET"
+	Rpush CommandName = "RPUSH"
 )
 
 type DataType int

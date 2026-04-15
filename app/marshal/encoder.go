@@ -21,6 +21,8 @@ func (e *Encoder) Encode(input *types.RedisData) ([]byte, error) {
 		return e.encodeError(input.Data), nil
 	case types.BString:
 		return e.encodeBString(input.Data), nil
+	case types.Integer:
+		return e.encodeInteger(input.Data), nil
 	case types.Null:
 		return e.encodeNullBulkString(), nil
 	}
@@ -42,4 +44,8 @@ func (e *Encoder) encodeBString(input string) []byte {
 
 func (e *Encoder) encodeNullBulkString() []byte {
 	return fmt.Appendf(nil, "$-1\r\n")
+}
+
+func (e *Encoder) encodeInteger(input string) []byte {
+	return fmt.Appendf(nil, ":%s\r\n", input)
 }

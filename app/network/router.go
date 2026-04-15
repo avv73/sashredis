@@ -3,6 +3,7 @@ package network
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 
@@ -66,6 +67,12 @@ func (r *RequestRouter) HandleConnection(ctx context.Context, connection net.Con
 		result, err := r.bus.Execute(ctx, command)
 		if err != nil {
 			log.WithError(err).Error("execution failed")
+
+			if redisErr, ok := errors.AsType[*types.RedisError](err); ok {
+				r.writeResult(connection, redisErr.AsRedisData())
+				continue
+			}
+
 			r.writeResult(connection, types.RedisErrorFromErr(types.GeneralError, err).AsRedisData())
 			continue
 		}

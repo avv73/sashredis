@@ -9,6 +9,7 @@ type ErrorType string
 
 const (
 	GeneralError ErrorType = "ERR"
+	WrongType    ErrorType = "WRONGTYPE"
 )
 
 type RedisError struct {
@@ -36,9 +37,15 @@ func (r *RedisError) Error() string {
 	return fmt.Sprintf("%s %s", r.Type, r.Message.Error())
 }
 
+func (r *RedisError) Unwrap() error {
+	return r.Message
+}
+
 func (r *RedisError) AsRedisData() *RedisData {
 	return &RedisData{
 		Type: Error,
-		Data: r.Message.Error(),
+		Data: r.Error(),
 	}
 }
+
+var ErrWrongType *RedisError = NewRedisError(WrongType, "Operation against a key holding the wrong kind of value")

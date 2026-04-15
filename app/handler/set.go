@@ -13,7 +13,7 @@ import (
 )
 
 type SetterStorage interface {
-	SetKvp(ctx context.Context, key string, data *types.RedisData, opts ...storage.SetKvpOpts)
+	SetKvp(ctx context.Context, key string, data *types.RedisData, opts ...storage.SetKvpOpts) error
 }
 
 type SetHandler struct {
@@ -40,7 +40,10 @@ func (s *SetHandler) HandleCommand(ctx context.Context, command *types.Command) 
 	}
 
 	storageOpts := s.setOptionalArgs(args)
-	s.storage.SetKvp(ctx, key.Data, val, storageOpts...)
+	err = s.storage.SetKvp(ctx, key.Data, val, storageOpts...)
+	if err != nil {
+		return nil, err
+	}
 
 	return types.OkResponse, nil
 }

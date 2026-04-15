@@ -11,12 +11,25 @@ import (
 )
 
 type Storage struct {
-	kvpStore map[string]*StorageBucket
+	store    map[string]*StorageBucket
 	systemMu sync.Mutex
 }
 
+type BucketType int
+
+const (
+	Value = iota + 1
+	List
+)
+
 type StorageBucket struct {
-	Data        *types.RedisData
+	Data     *types.RedisData
+	Type     BucketType
+	Holds    []*types.RedisData
+	Metadata *StorageMetadata
+}
+
+type StorageMetadata struct {
 	MsExp       *int
 	LastWritten time.Time
 }
@@ -35,12 +48,12 @@ func WithMillisecondsExp(milliseconds int) SetKvpOpts {
 
 func NewStorage() *Storage {
 	return &Storage{
-		kvpStore: make(map[string]*StorageBucket),
+		store:    make(map[string]*StorageBucket),
 		systemMu: sync.Mutex{},
 	}
 }
 
-func (s *Storage) SetKvp(ctx context.Context, key string, data *types.RedisData, opts ...SetKvpOpts) {
+func (s *Storage) SetKvp(ctx context.Context, key string, data *types.RedisData, opts ...SetKvpOpts) error {
 	option := SetKvpOption{}
 	for _, opt := range opts {
 		opt(&option)
@@ -48,35 +61,63 @@ func (s *Storage) SetKvp(ctx context.Context, key string, data *types.RedisData,
 
 	s.systemMu.Lock()
 	defer s.systemMu.Unlock()
+
 	storageBucket := StorageBucket{
-		LastWritten: time.Now(),
+		Type: Value,
+		Data: data,
+		Metadata: &StorageMetadata{
+			LastWritten: time.Now(),
+		},
 	}
 
 	if option.MsExpiration != nil {
-		storageBucket.MsExp = option.MsExpiration
-		go s.scheduleDeletion(ctx, key, storageBucket)
+		storageBucket.Metadata.MsExp = option.MsExpiration
+		go s.scheduleDeletion(ctx, key, *storageBucket.Metadata)
 	}
 
-	storageBucket.Data = data
-	s.kvpStore[key] = &storageBucket
+	s.store[key] = &storageBucket
+	return nil
 }
 
-func (s *Storage) GetKvp(key string) (*types.RedisData, bool) {
+func (s *Storage) GetKvp(key string) (*types.RedisData, bool, error) {
 	s.systemMu.Lock()
 	defer s.systemMu.Unlock()
-	result, ok := s.kvpStore[key]
-	if !ok {
-		return nil, false
-	}
-	if result.MsExp != nil && result.LastWritten.Add(time.Millisecond*time.Duration(*result.MsExp)).Before(time.Now()) {
-		delete(s.kvpStore, key)
-		return nil, false
+	if !s.doesExistingDataMatchType(key, Value) {
+		return nil, false, types.ErrWrongType
 	}
 
-	return result.Data, true
+	result, ok := s.store[key]
+	if !ok {
+		return nil, false, nil
+	}
+	if result.Metadata != nil &&
+		result.Metadata.MsExp != nil &&
+		result.Metadata.LastWritten.Add(time.Millisecond*time.Duration(*result.Metadata.MsExp)).Before(time.Now()) {
+		delete(s.store, key)
+		return nil, false, nil
+	}
+
+	return result.Data, true, nil
 }
 
-func (s *Storage) scheduleDeletion(ctx context.Context, key string, bucket StorageBucket) {
+func (s *Storage) AppendToList(key string, data *types.RedisData) (int, error) {
+	if !s.doesExistingDataMatchType(key, List) {
+		return 0, types.ErrWrongType
+	}
+
+	_, ok := s.store[key]
+	if !ok {
+		s.store[key] = &StorageBucket{
+			Type:  List,
+			Holds: make([]*types.RedisData, 0, 1),
+		}
+	}
+
+	s.store[key].Holds = append(s.store[key].Holds, data)
+	return len(s.store[key].Holds), nil
+}
+
+func (s *Storage) scheduleDeletion(ctx context.Context, key string, bucket StorageMetadata) {
 	timer := time.NewTimer(time.Millisecond * time.Duration(*bucket.MsExp))
 	log.Infof("logged for deletion - %s", key)
 	select {
@@ -88,11 +129,21 @@ func (s *Storage) scheduleDeletion(ctx context.Context, key string, bucket Stora
 	s.systemMu.Lock()
 	defer s.systemMu.Unlock()
 	log.Infof("start deletion - %s", key)
-	data, ok := s.kvpStore[key]
-	if !ok || !data.LastWritten.Equal(bucket.LastWritten) {
+	data, ok := s.store[key]
+	metadata := data.Metadata
+	if !ok || metadata == nil || !metadata.LastWritten.Equal(bucket.LastWritten) {
 		// Exit scheduler if data is no longer available or the data has been changed in the meantime.
 		return
 	}
 
-	delete(s.kvpStore, key)
+	delete(s.store, key)
+}
+
+// Returns true if we have stored with the same key with the same bucket type, returns true if key is not found.
+func (s *Storage) doesExistingDataMatchType(key string, targetType BucketType) bool {
+	val, ok := s.store[key]
+	if !ok {
+		return true
+	}
+	return val.Type == targetType
 }

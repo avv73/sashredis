@@ -8,7 +8,7 @@ import (
 )
 
 type GetterStorage interface {
-	GetKvp(key string) (*types.RedisData, bool)
+	GetKvp(key string) (*types.RedisData, bool, error)
 }
 
 type GetHandler struct {
@@ -28,7 +28,11 @@ func (s *GetHandler) HandleCommand(ctx context.Context, command *types.Command) 
 
 	key := command.Args[0]
 
-	result, ok := s.storage.GetKvp(key.Data)
+	result, ok, err := s.storage.GetKvp(key.Data)
+	if err != nil {
+		return nil, err
+	}
+
 	if !ok {
 		return types.NullResponse, nil
 	}
