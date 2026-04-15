@@ -2,6 +2,7 @@ package marshal
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/codecrafters-io/redis-starter-go/app/types"
 )
@@ -23,6 +24,8 @@ func (e *Encoder) Encode(input *types.RedisData) ([]byte, error) {
 		return e.encodeBString(input.Data), nil
 	case types.Integer:
 		return e.encodeInteger(input.Data), nil
+	case types.Array:
+		return e.encodeArray(input)
 	case types.Null:
 		return e.encodeNullBulkString(), nil
 	}
@@ -48,4 +51,18 @@ func (e *Encoder) encodeNullBulkString() []byte {
 
 func (e *Encoder) encodeInteger(input string) []byte {
 	return fmt.Appendf(nil, ":%s\r\n", input)
+}
+
+func (e *Encoder) encodeArray(input *types.RedisData) ([]byte, error) {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("*%d\r\n", len(input.Holds)))
+
+	for _, element := range input.Holds {
+		result, err := e.Encode(element)
+		if err != nil {
+			return nil, err
+		}
+		sb.Write(result)
+	}
+	return []byte(sb.String()), nil
 }

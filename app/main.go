@@ -29,13 +29,15 @@ func main() {
 	getHandler := handler.NewGetHandler(storage)
 	setHandler := handler.NewSetHandler(storage)
 	rpushHandler := handler.NewRpushHandler(storage)
+	lrangeHandler := handler.NewLRangeHandler(storage)
 
 	handlers := map[types.CommandName]processor.CommandHandler{
-		types.Ping:  pingHandler,
-		types.Echo:  echoHandler,
-		types.Get:   getHandler,
-		types.Set:   setHandler,
-		types.Rpush: rpushHandler,
+		types.Ping:   pingHandler,
+		types.Echo:   echoHandler,
+		types.Get:    getHandler,
+		types.Set:    setHandler,
+		types.Rpush:  rpushHandler,
+		types.Lrange: lrangeHandler,
 	}
 
 	parser := marshal.NewParser()

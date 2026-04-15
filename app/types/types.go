@@ -8,11 +8,12 @@ import (
 type CommandName string
 
 const (
-	Ping  CommandName = "PING"
-	Echo  CommandName = "ECHO"
-	Set   CommandName = "SET"
-	Get   CommandName = "GET"
-	Rpush CommandName = "RPUSH"
+	Ping   CommandName = "PING"
+	Echo   CommandName = "ECHO"
+	Set    CommandName = "SET"
+	Get    CommandName = "GET"
+	Rpush  CommandName = "RPUSH"
+	Lrange CommandName = "LRANGE"
 )
 
 type DataType int
@@ -62,8 +63,8 @@ func (r *RedisData) IsNil() bool {
 
 func (r *RedisData) String() string {
 	var nested strings.Builder
-	if len(r.Holds) > 0 {
-		nested.WriteString(r.String())
+	for _, child := range r.Holds {
+		nested.WriteString(child.String())
 	}
 
 	return fmt.Sprintf("%s:<data: %s> holds: [%s]", r.Type.String(), r.Data, nested.String())

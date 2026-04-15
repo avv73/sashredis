@@ -117,6 +117,28 @@ func (s *Storage) AppendToList(key string, data *types.RedisData) (int, error) {
 	return len(s.store[key].Holds), nil
 }
 
+func (s *Storage) FetchFromList(key string, startIdx int, endIdx int) ([]*types.RedisData, error) {
+	if !s.doesExistingDataMatchType(key, List) {
+		return nil, types.ErrWrongType
+	}
+
+	list, ok := s.store[key]
+	if !ok {
+		return []*types.RedisData{}, nil
+	}
+
+	if startIdx >= len(list.Holds) || startIdx > endIdx {
+		return []*types.RedisData{}, nil
+	}
+
+	endIdx++ // inclusive
+	if endIdx > len(list.Holds) {
+		endIdx = len(list.Holds)
+	}
+
+	return list.Holds[startIdx:endIdx], nil
+}
+
 func (s *Storage) scheduleDeletion(ctx context.Context, key string, bucket StorageMetadata) {
 	timer := time.NewTimer(time.Millisecond * time.Duration(*bucket.MsExp))
 	log.Infof("logged for deletion - %s", key)
