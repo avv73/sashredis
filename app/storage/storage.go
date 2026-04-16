@@ -127,6 +127,13 @@ func (s *Storage) FetchFromList(key string, startIdx int, endIdx int) ([]*types.
 		return []*types.RedisData{}, nil
 	}
 
+	if startIdx < 0 {
+		startIdx = max(len(list.Holds)+startIdx, 0)
+	}
+	if endIdx < 0 {
+		endIdx = max(len(list.Holds)+endIdx, 0)
+	}
+
 	if startIdx >= len(list.Holds) || startIdx > endIdx {
 		return []*types.RedisData{}, nil
 	}
