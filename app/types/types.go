@@ -15,6 +15,7 @@ const (
 	Rpush  CommandName = "RPUSH"
 	Lrange CommandName = "LRANGE"
 	Lpush  CommandName = "LPUSH"
+	Llen   CommandName = "LLEN"
 )
 
 type DataType int

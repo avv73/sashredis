@@ -174,6 +174,18 @@ func (s *Storage) FetchFromList(key string, startIdx int, endIdx int) ([]*types.
 	return result, nil
 }
 
+func (s *Storage) ListLength(key string) (int, error) {
+	if !s.doesExistingDataMatchType(key, List) {
+		return 0, types.ErrWrongType
+	}
+
+	bucket, ok := s.store[key]
+	if !ok {
+		return 0, nil
+	}
+	return bucket.List.Len(), nil
+}
+
 func (s *Storage) scheduleDeletion(ctx context.Context, key string, bucket StorageMetadata) {
 	timer := time.NewTimer(time.Millisecond * time.Duration(*bucket.MsExp))
 	log.Infof("logged for deletion - %s", key)
