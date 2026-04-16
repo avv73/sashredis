@@ -12,17 +12,17 @@ type RangeStorage interface {
 	FetchFromList(key string, startIdx int, endIdx int) ([]*types.RedisData, error)
 }
 
-type LRangeHandler struct {
+type LrangeHandler struct {
 	storage RangeStorage
 }
 
-func NewLRangeHandler(storage RangeStorage) *LRangeHandler {
-	return &LRangeHandler{
+func NewLrangeHandler(storage RangeStorage) *LrangeHandler {
+	return &LrangeHandler{
 		storage: storage,
 	}
 }
 
-func (l *LRangeHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (l *LrangeHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
 	if len(command.Args) != 3 {
 		return nil, errors.New("unexpected number of arguments")
 	}

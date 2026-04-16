@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"container/list"
 	"context"
 	"sync"
 	"time"
@@ -25,7 +26,7 @@ const (
 type StorageBucket struct {
 	Data     *types.RedisData
 	Type     BucketType
-	Holds    []*types.RedisData
+	List     *list.List
 	Metadata *StorageMetadata
 }
 
@@ -108,13 +109,30 @@ func (s *Storage) AppendToList(key string, data *types.RedisData) (int, error) {
 	_, ok := s.store[key]
 	if !ok {
 		s.store[key] = &StorageBucket{
-			Type:  List,
-			Holds: make([]*types.RedisData, 0, 1),
+			Type: List,
+			List: list.New(),
 		}
 	}
 
-	s.store[key].Holds = append(s.store[key].Holds, data)
-	return len(s.store[key].Holds), nil
+	s.store[key].List.PushBack(data)
+	return s.store[key].List.Len(), nil
+}
+
+func (s *Storage) PrependToList(key string, data *types.RedisData) (int, error) {
+	if !s.doesExistingDataMatchType(key, List) {
+		return 0, types.ErrWrongType
+	}
+
+	_, ok := s.store[key]
+	if !ok {
+		s.store[key] = &StorageBucket{
+			Type: List,
+			List: list.New(),
+		}
+	}
+
+	s.store[key].List.PushFront(data)
+	return s.store[key].List.Len(), nil
 }
 
 func (s *Storage) FetchFromList(key string, startIdx int, endIdx int) ([]*types.RedisData, error) {
@@ -122,28 +140,38 @@ func (s *Storage) FetchFromList(key string, startIdx int, endIdx int) ([]*types.
 		return nil, types.ErrWrongType
 	}
 
-	list, ok := s.store[key]
+	bucket, ok := s.store[key]
 	if !ok {
 		return []*types.RedisData{}, nil
 	}
 
 	if startIdx < 0 {
-		startIdx = max(len(list.Holds)+startIdx, 0)
+		startIdx = max(bucket.List.Len()+startIdx, 0)
 	}
 	if endIdx < 0 {
-		endIdx = max(len(list.Holds)+endIdx, 0)
+		endIdx = max(bucket.List.Len()+endIdx, 0)
 	}
 
-	if startIdx >= len(list.Holds) || startIdx > endIdx {
+	if startIdx >= bucket.List.Len() || startIdx > endIdx {
 		return []*types.RedisData{}, nil
 	}
 
-	endIdx++ // inclusive
-	if endIdx > len(list.Holds) {
-		endIdx = len(list.Holds)
+	endIdx++ // including
+	if endIdx > bucket.List.Len() {
+		endIdx = bucket.List.Len()
 	}
 
-	return list.Holds[startIdx:endIdx], nil
+	var counter int
+	var result []*types.RedisData
+	for e := bucket.List.Front(); e != nil && counter < endIdx; e = e.Next() {
+		if counter >= startIdx {
+			result = append(result, e.Value.(*types.RedisData))
+		}
+
+		counter++
+	}
+
+	return result, nil
 }
 
 func (s *Storage) scheduleDeletion(ctx context.Context, key string, bucket StorageMetadata) {

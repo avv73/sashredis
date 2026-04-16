@@ -14,6 +14,7 @@ const (
 	Get    CommandName = "GET"
 	Rpush  CommandName = "RPUSH"
 	Lrange CommandName = "LRANGE"
+	Lpush  CommandName = "LPUSH"
 )
 
 type DataType int
