@@ -3,6 +3,7 @@ package storage
 import (
 	"container/list"
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -186,9 +187,13 @@ func (s *Storage) ListLength(key string) (int, error) {
 	return bucket.List.Len(), nil
 }
 
-func (s *Storage) PopList(key string) (*types.RedisData, bool, error) {
+func (s *Storage) PopList(key string, times int) (*types.RedisData, bool, error) {
 	if !s.doesExistingDataMatchType(key, List) {
 		return nil, false, types.ErrWrongType
+	}
+
+	if times < 0 {
+		return nil, false, errors.New("value is out of range, must be positive")
 	}
 
 	bucket, ok := s.store[key]
@@ -196,7 +201,22 @@ func (s *Storage) PopList(key string) (*types.RedisData, bool, error) {
 		return nil, false, nil
 	}
 
-	result := bucket.List.Remove(bucket.List.Front()).(*types.RedisData)
+	if times == 1 {
+		result := bucket.List.Remove(bucket.List.Front()).(*types.RedisData)
+		return result, true, nil
+	}
+
+	times = min(times, bucket.List.Len())
+
+	result := &types.RedisData{
+		Type:  types.Array,
+		Holds: make([]*types.RedisData, 0, times),
+	}
+
+	for range times {
+		result.Holds = append(result.Holds, bucket.List.Remove(bucket.List.Front()).(*types.RedisData))
+	}
+
 	return result, true, nil
 }
 
