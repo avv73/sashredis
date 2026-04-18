@@ -186,6 +186,20 @@ func (s *Storage) ListLength(key string) (int, error) {
 	return bucket.List.Len(), nil
 }
 
+func (s *Storage) PopList(key string) (*types.RedisData, bool, error) {
+	if !s.doesExistingDataMatchType(key, List) {
+		return nil, false, types.ErrWrongType
+	}
+
+	bucket, ok := s.store[key]
+	if !ok {
+		return nil, false, nil
+	}
+
+	result := bucket.List.Remove(bucket.List.Front()).(*types.RedisData)
+	return result, true, nil
+}
+
 func (s *Storage) scheduleDeletion(ctx context.Context, key string, bucket StorageMetadata) {
 	timer := time.NewTimer(time.Millisecond * time.Duration(*bucket.MsExp))
 	log.Infof("logged for deletion - %s", key)
