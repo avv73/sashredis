@@ -203,7 +203,7 @@ func (s *Storage) PopList(key string, times int) (*types.RedisData, bool, error)
 	}
 
 	bucket, ok := s.store[key]
-	if !ok {
+	if !ok || bucket.List.Len() == 0 {
 		return nil, false, nil
 	}
 
@@ -226,9 +226,13 @@ func (s *Storage) PopList(key string, times int) (*types.RedisData, bool, error)
 	return result, true, nil
 }
 
-func (s *Storage) BlockOnPopList(key string) (*types.RedisData, error) {
+func (s *Storage) BlockOnPopList(key string, timeout float64) (*types.RedisData, bool, error) {
 	if !s.doesExistingDataMatchType(key, List) {
-		return nil, types.ErrWrongType
+		return nil, false, types.ErrWrongType
+	}
+
+	if timeout < 0 {
+		return nil, false, errors.New("expected positive timeout")
 	}
 
 	if _, ok := s.storeNotify[key]; !ok {
@@ -238,12 +242,24 @@ func (s *Storage) BlockOnPopList(key string) (*types.RedisData, error) {
 	updateCh := make(chan *types.RedisData)
 	s.storeNotify[key] = append(s.storeNotify[key], updateCh)
 
-	updatedData := <-updateCh
+	timeoutTimer := time.NewTimer(time.Duration(timeout * float64(time.Second)))
+	var updatedData *types.RedisData
+
+	if timeout == 0 {
+		timeoutTimer.Stop()
+	}
+
+	select {
+	case <-timeoutTimer.C:
+		return nil, false, nil
+	case updatedData = <-updateCh:
+	}
+
 	s.systemMu.Lock()
 	defer s.systemMu.Unlock()
 	s.PopList(key, 1)
 
-	return updatedData, nil
+	return updatedData, true, nil
 }
 
 func (s *Storage) scheduleDeletion(ctx context.Context, key string, bucket StorageMetadata) {

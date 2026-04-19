@@ -28,6 +28,8 @@ func (e *Encoder) Encode(input *types.RedisData) ([]byte, error) {
 		return e.encodeArray(input)
 	case types.Null:
 		return e.encodeNullBulkString(), nil
+	case types.NullArray:
+		return e.encodeNullArray(), nil
 	}
 
 	return nil, fmt.Errorf("unsupported redis data type for encoding: %d", input.Type)
@@ -47,6 +49,10 @@ func (e *Encoder) encodeBString(input string) []byte {
 
 func (e *Encoder) encodeNullBulkString() []byte {
 	return fmt.Appendf(nil, "$-1\r\n")
+}
+
+func (e *Encoder) encodeNullArray() []byte {
+	return fmt.Appendf(nil, "*-1\r\n")
 }
 
 func (e *Encoder) encodeInteger(input string) []byte {

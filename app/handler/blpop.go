@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"strconv"
 
 	"github.com/codecrafters-io/redis-starter-go/app/types"
 	log "github.com/sirupsen/logrus"
@@ -10,7 +11,7 @@ import (
 
 type BlockPopStorage interface {
 	PopList(key string, times int) (*types.RedisData, bool, error)
-	BlockOnPopList(key string) (*types.RedisData, error)
+	BlockOnPopList(key string, timeout float64) (*types.RedisData, bool, error)
 }
 
 type ConnUnblocker interface {
@@ -35,6 +36,11 @@ func (s *BlpopHandler) HandleCommand(ctx context.Context, command *types.Command
 	}
 
 	key := command.Args[0].Data
+	timeout, err := strconv.ParseFloat(command.Args[1].Data, 32)
+	if err != nil {
+		return nil, errors.New("expected timeout to be a positive float")
+	}
+
 	result, ok, err := s.storage.PopList(key, 1)
 	if err != nil {
 		return nil, err
@@ -54,17 +60,24 @@ func (s *BlpopHandler) HandleCommand(ctx context.Context, command *types.Command
 	}
 
 	go func() {
-		resultData, exErr := s.storage.BlockOnPopList(key)
-		result := &types.RedisData{
-			Type: types.Array,
-			Holds: []*types.RedisData{
-				{
-					Type: types.BString,
-					Data: key,
+		resultData, ok, exErr := s.storage.BlockOnPopList(key, timeout)
+
+		var result *types.RedisData
+		if !ok {
+			result = types.NullArrayResponse
+		} else {
+			result = &types.RedisData{
+				Type: types.Array,
+				Holds: []*types.RedisData{
+					{
+						Type: types.BString,
+						Data: key,
+					},
+					resultData,
 				},
-				resultData,
-			},
+			}
 		}
+
 		if unblockErr := s.connUnblocker.UnblockConn(ctx, result, exErr); unblockErr != nil {
 			log.WithError(unblockErr).Error("failed to unblock connection")
 		}

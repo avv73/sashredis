@@ -24,6 +24,7 @@ type DataType int
 
 const (
 	Null DataType = iota
+	NullArray
 	Integer
 	SString
 	BString

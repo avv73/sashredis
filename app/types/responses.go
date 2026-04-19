@@ -8,3 +8,7 @@ var OkResponse *RedisData = &RedisData{
 var NullResponse *RedisData = &RedisData{
 	Type: Null,
 }
+
+var NullArrayResponse *RedisData = &RedisData{
+	Type: NullArray,
+}
