@@ -23,6 +23,7 @@ func main() {
 	defer cancel()
 
 	storage := storage.NewStorage()
+	bus := processor.NewEventBus()
 
 	pingHandler := handler.NewPingHandler()
 	echoHandler := handler.NewEchoHandler()
@@ -33,6 +34,7 @@ func main() {
 	lpushHandler := handler.NewLpushHandler(storage)
 	llenHandler := handler.NewLlenHandler(storage)
 	lpopHandler := handler.NewLpopHandler(storage)
+	blpopHandler := handler.NewBlpopHandler(storage, bus)
 
 	handlers := map[types.CommandName]processor.CommandHandler{
 		types.Ping:   pingHandler,
@@ -44,12 +46,12 @@ func main() {
 		types.Lpush:  lpushHandler,
 		types.Llen:   llenHandler,
 		types.Lpop:   lpopHandler,
+		types.Blpop:  blpopHandler,
 	}
 
 	parser := marshal.NewParser()
 	encoder := marshal.NewEncoder()
 
-	bus := processor.NewEventBus()
 	processor := processor.NewProcessor(bus, handlers)
 
 	router := network.NewRequestRouter(bus, parser, encoder)

@@ -13,8 +13,9 @@ import (
 )
 
 type Storage struct {
-	store    map[string]*StorageBucket
-	systemMu sync.Mutex
+	store       map[string]*StorageBucket
+	systemMu    sync.Mutex
+	storeNotify map[string][]chan *types.RedisData
 }
 
 type BucketType int
@@ -50,8 +51,9 @@ func WithMillisecondsExp(milliseconds int) SetKvpOpts {
 
 func NewStorage() *Storage {
 	return &Storage{
-		store:    make(map[string]*StorageBucket),
-		systemMu: sync.Mutex{},
+		store:       make(map[string]*StorageBucket),
+		systemMu:    sync.Mutex{},
+		storeNotify: make(map[string][]chan *types.RedisData),
 	}
 }
 
@@ -116,6 +118,8 @@ func (s *Storage) AppendToList(key string, data *types.RedisData) (int, error) {
 	}
 
 	s.store[key].List.PushBack(data)
+	s.notify(key, data)
+
 	return s.store[key].List.Len(), nil
 }
 
@@ -133,6 +137,8 @@ func (s *Storage) PrependToList(key string, data *types.RedisData) (int, error) 
 	}
 
 	s.store[key].List.PushFront(data)
+	s.notify(key, data)
+
 	return s.store[key].List.Len(), nil
 }
 
@@ -220,6 +226,26 @@ func (s *Storage) PopList(key string, times int) (*types.RedisData, bool, error)
 	return result, true, nil
 }
 
+func (s *Storage) BlockOnPopList(key string) (*types.RedisData, error) {
+	if !s.doesExistingDataMatchType(key, List) {
+		return nil, types.ErrWrongType
+	}
+
+	if _, ok := s.storeNotify[key]; !ok {
+		s.storeNotify[key] = make([]chan *types.RedisData, 0)
+	}
+
+	updateCh := make(chan *types.RedisData)
+	s.storeNotify[key] = append(s.storeNotify[key], updateCh)
+
+	updatedData := <-updateCh
+	s.systemMu.Lock()
+	defer s.systemMu.Unlock()
+	s.PopList(key, 1)
+
+	return updatedData, nil
+}
+
 func (s *Storage) scheduleDeletion(ctx context.Context, key string, bucket StorageMetadata) {
 	timer := time.NewTimer(time.Millisecond * time.Duration(*bucket.MsExp))
 	log.Infof("logged for deletion - %s", key)
@@ -249,4 +275,15 @@ func (s *Storage) doesExistingDataMatchType(key string, targetType BucketType) b
 		return true
 	}
 	return val.Type == targetType
+}
+
+func (s *Storage) notify(key string, data *types.RedisData) {
+	if subs, ok := s.storeNotify[key]; ok {
+		subs[0] <- data
+		if len(subs) == 1 {
+			delete(s.storeNotify, key)
+		} else {
+			subs = subs[1:]
+		}
+	}
 }

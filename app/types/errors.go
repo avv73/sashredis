@@ -49,3 +49,12 @@ func (r *RedisError) AsRedisData() *RedisData {
 }
 
 var ErrWrongType *RedisError = NewRedisError(WrongType, "Operation against a key holding the wrong kind of value")
+
+type BlockError struct {
+}
+
+func (r *BlockError) Error() string {
+	return "blocking client connection"
+}
+
+var ErrBlock *BlockError = &BlockError{}

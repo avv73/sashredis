@@ -10,7 +10,7 @@ import (
 )
 
 type EventBusPublisher interface {
-	GetCommand(ctx context.Context) (*types.Command, ResultCallback, error)
+	GetCommand(ctx context.Context) (*types.Command, context.Context, ResultCallback, error)
 }
 
 type CommandHandler interface {
@@ -33,13 +33,13 @@ func (p *Processor) Start(ctx context.Context) {
 	go func() {
 		log.Info("main processor loop starting")
 		for {
-			command, callback, err := p.eventBus.GetCommand(ctx)
+			command, execCtx, callback, err := p.eventBus.GetCommand(ctx)
 			if err != nil {
 				log.WithError(err).Info("main processor terminating")
 				return
 			}
 
-			result, err := p.executeCommand(ctx, command)
+			result, err := p.executeCommand(execCtx, command)
 			callback(result, err)
 		}
 	}()

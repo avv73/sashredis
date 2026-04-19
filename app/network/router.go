@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/codecrafters-io/redis-starter-go/app/exctx"
 	"github.com/codecrafters-io/redis-starter-go/app/types"
 )
 
@@ -42,6 +44,9 @@ func NewRequestRouter(bus EventBus, parser CommandParser, encoder ResultEncoder)
 func (r *RequestRouter) HandleConnection(ctx context.Context, connection net.Conn) error {
 	defer connection.Close()
 	reader := bufio.NewReader(connection)
+	ctx = exctx.NewContext(ctx, &exctx.ContextValue{
+		ConnectionId: uuid.New().String(),
+	})
 	for {
 		_, err := reader.ReadByte() // block until first byte
 		if err != nil {
