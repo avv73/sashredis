@@ -11,7 +11,7 @@ import (
 
 type BlockPopStorage interface {
 	PopList(key string, times int) (*types.RedisData, bool, error)
-	BlockOnPopList(key string, timeout float64) (*types.RedisData, bool, error)
+	SchedulePopList(ctx context.Context, key string, timeout float64, callback func(*types.RedisData, bool)) error
 }
 
 type ConnUnblocker interface {
@@ -59,11 +59,9 @@ func (s *BlpopHandler) HandleCommand(ctx context.Context, command *types.Command
 		}, nil
 	}
 
-	go func() {
-		resultData, ok, exErr := s.storage.BlockOnPopList(key, timeout)
-
+	err = s.storage.SchedulePopList(ctx, key, timeout, func(rd *types.RedisData, b bool) {
 		var result *types.RedisData
-		if !ok {
+		if !b {
 			result = types.NullArrayResponse
 		} else {
 			result = &types.RedisData{
@@ -73,15 +71,20 @@ func (s *BlpopHandler) HandleCommand(ctx context.Context, command *types.Command
 						Type: types.BString,
 						Data: key,
 					},
-					resultData,
+					rd,
 				},
 			}
 		}
 
-		if unblockErr := s.connUnblocker.UnblockConn(ctx, result, exErr); unblockErr != nil {
+		if unblockErr := s.connUnblocker.UnblockConn(ctx, result, nil); unblockErr != nil {
 			log.WithError(unblockErr).Error("failed to unblock connection")
 		}
-	}()
+	})
+
+	if err != nil {
+		return nil, err
+	}
 
 	return nil, types.ErrBlock
+
 }

@@ -12,16 +12,17 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/types"
 )
 
+type StoreNotifyCallback func(*types.RedisData)
+
 type Storage struct {
 	store       map[string]*StorageBucket
-	systemMu    sync.Mutex
-	storeNotify map[string][]chan *types.RedisData
+	storeNotify map[string][]StoreNotifyCallback
 }
 
 type BucketType int
 
 const (
-	Value = iota + 1
+	Value BucketType = iota + 1
 	List
 )
 
@@ -35,6 +36,10 @@ type StorageBucket struct {
 type StorageMetadata struct {
 	MsExp       *int
 	LastWritten time.Time
+}
+
+func (s *StorageMetadata) isExpired() bool {
+	return s.MsExp != nil && s.LastWritten.Add(time.Millisecond*time.Duration(*s.MsExp)).Before(time.Now())
 }
 
 type SetKvpOpts func(*SetKvpOption)
@@ -52,19 +57,16 @@ func WithMillisecondsExp(milliseconds int) SetKvpOpts {
 func NewStorage() *Storage {
 	return &Storage{
 		store:       make(map[string]*StorageBucket),
-		systemMu:    sync.Mutex{},
-		storeNotify: make(map[string][]chan *types.RedisData),
+		storeNotify: make(map[string][]StoreNotifyCallback),
 	}
 }
 
 func (s *Storage) SetKvp(ctx context.Context, key string, data *types.RedisData, opts ...SetKvpOpts) error {
+	s.probeExpiredValues()
 	option := SetKvpOption{}
 	for _, opt := range opts {
 		opt(&option)
 	}
-
-	s.systemMu.Lock()
-	defer s.systemMu.Unlock()
 
 	storageBucket := StorageBucket{
 		Type: Value,
@@ -76,7 +78,6 @@ func (s *Storage) SetKvp(ctx context.Context, key string, data *types.RedisData,
 
 	if option.MsExpiration != nil {
 		storageBucket.Metadata.MsExp = option.MsExpiration
-		go s.scheduleDeletion(ctx, key, *storageBucket.Metadata)
 	}
 
 	s.store[key] = &storageBucket
@@ -84,8 +85,7 @@ func (s *Storage) SetKvp(ctx context.Context, key string, data *types.RedisData,
 }
 
 func (s *Storage) GetKvp(key string) (*types.RedisData, bool, error) {
-	s.systemMu.Lock()
-	defer s.systemMu.Unlock()
+	s.probeExpiredValues()
 	if !s.doesExistingDataMatchType(key, Value) {
 		return nil, false, types.ErrWrongType
 	}
@@ -94,9 +94,7 @@ func (s *Storage) GetKvp(key string) (*types.RedisData, bool, error) {
 	if !ok {
 		return nil, false, nil
 	}
-	if result.Metadata != nil &&
-		result.Metadata.MsExp != nil &&
-		result.Metadata.LastWritten.Add(time.Millisecond*time.Duration(*result.Metadata.MsExp)).Before(time.Now()) {
+	if result.Metadata != nil && result.Metadata.isExpired() {
 		delete(s.store, key)
 		return nil, false, nil
 	}
@@ -118,8 +116,8 @@ func (s *Storage) AppendToList(key string, data *types.RedisData) (int, error) {
 	}
 
 	s.store[key].List.PushBack(data)
-	s.notify(key, data)
 
+	defer s.notify(key, data)
 	return s.store[key].List.Len(), nil
 }
 
@@ -226,62 +224,86 @@ func (s *Storage) PopList(key string, times int) (*types.RedisData, bool, error)
 	return result, true, nil
 }
 
-func (s *Storage) BlockOnPopList(key string, timeout float64) (*types.RedisData, bool, error) {
+func (s *Storage) SchedulePopList(ctx context.Context, key string, timeout float64, callback func(*types.RedisData, bool)) error {
 	if !s.doesExistingDataMatchType(key, List) {
-		return nil, false, types.ErrWrongType
+		return types.ErrWrongType
 	}
 
 	if timeout < 0 {
-		return nil, false, errors.New("expected positive timeout")
+		return errors.New("expected positive timeout")
 	}
 
 	if _, ok := s.storeNotify[key]; !ok {
-		s.storeNotify[key] = make([]chan *types.RedisData, 0)
+		s.storeNotify[key] = make([]StoreNotifyCallback, 0, 1)
 	}
 
-	updateCh := make(chan *types.RedisData)
-	s.storeNotify[key] = append(s.storeNotify[key], updateCh)
-
-	timeoutTimer := time.NewTimer(time.Duration(timeout * float64(time.Second)))
-	var updatedData *types.RedisData
-
-	if timeout == 0 {
-		timeoutTimer.Stop()
+	doneCtx, cancel := context.WithCancel(ctx)
+	var once sync.Once
+	notifyCallback := func(data *types.RedisData) {
+		cancel()
+		once.Do(func() {
+			bucket, ok := s.store[key]
+			if !ok || bucket.List.Len() == 0 {
+				log.Error("unexpected: possible race condition, empty after notification")
+				callback(nil, false)
+				return
+			}
+			result := bucket.List.Remove(bucket.List.Front()).(*types.RedisData)
+			callback(result, true)
+		})
 	}
 
-	select {
-	case <-timeoutTimer.C:
-		return nil, false, nil
-	case updatedData = <-updateCh:
+	s.storeNotify[key] = append(s.storeNotify[key], notifyCallback)
+
+	if timeout != 0 {
+		go func() {
+			timeoutTimer := time.NewTimer(time.Duration(timeout * float64(time.Second)))
+			select {
+			case <-timeoutTimer.C:
+				once.Do(func() {
+					callback(nil, false)
+				})
+			case <-doneCtx.Done():
+				return
+			}
+		}()
 	}
-
-	s.systemMu.Lock()
-	defer s.systemMu.Unlock()
-	s.PopList(key, 1)
-
-	return updatedData, true, nil
+	return nil
 }
 
-func (s *Storage) scheduleDeletion(ctx context.Context, key string, bucket StorageMetadata) {
-	timer := time.NewTimer(time.Millisecond * time.Duration(*bucket.MsExp))
-	log.Infof("logged for deletion - %s", key)
-	select {
-	case <-ctx.Done():
-		return
-	case <-timer.C:
+func (s *Storage) Type(ctx context.Context, key string) string {
+	bucket, ok := s.store[key]
+	if !ok {
+		return "none"
 	}
 
-	s.systemMu.Lock()
-	defer s.systemMu.Unlock()
-	log.Infof("start deletion - %s", key)
-	data, ok := s.store[key]
-	metadata := data.Metadata
-	if !ok || metadata == nil || !metadata.LastWritten.Equal(bucket.LastWritten) {
-		// Exit scheduler if data is no longer available or the data has been changed in the meantime.
-		return
+	switch bucket.Type {
+	case Value:
+		return "string"
+	case List:
+		return "list"
 	}
 
-	delete(s.store, key)
+	log.Errorf("unexpected type command key: %s for bucket type: %d", key, bucket.Type)
+	return "?"
+}
+
+func (s *Storage) probeExpiredValues() {
+	attempts := 3
+	for key, val := range s.store {
+		if attempts <= 0 {
+			return
+		}
+
+		attempts--
+		if val.Type != Value {
+			continue
+		}
+
+		if val.Metadata != nil && val.Metadata.isExpired() {
+			delete(s.store, key)
+		}
+	}
 }
 
 // Returns true if we have stored with the same key with the same bucket type, returns true if key is not found.
@@ -295,11 +317,11 @@ func (s *Storage) doesExistingDataMatchType(key string, targetType BucketType) b
 
 func (s *Storage) notify(key string, data *types.RedisData) {
 	if subs, ok := s.storeNotify[key]; ok {
-		subs[0] <- data
+		subs[0](data)
 		if len(subs) == 1 {
 			delete(s.storeNotify, key)
 		} else {
-			subs = subs[1:]
+			s.storeNotify[key] = subs[1:]
 		}
 	}
 }

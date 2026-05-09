@@ -18,6 +18,7 @@ const (
 	Llen   CommandName = "LLEN"
 	Lpop   CommandName = "LPOP"
 	Blpop  CommandName = "BLPOP"
+	Type   CommandName = "TYPE"
 )
 
 type DataType int
