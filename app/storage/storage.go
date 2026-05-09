@@ -24,12 +24,19 @@ type BucketType int
 const (
 	Value BucketType = iota + 1
 	List
+	Stream
 )
+
+type StreamKvp struct {
+	Key   string
+	Value string
+}
 
 type StorageBucket struct {
 	Data     *types.RedisData
 	Type     BucketType
 	List     *list.List
+	Stream   map[string][]*StreamKvp
 	Metadata *StorageMetadata
 }
 
@@ -282,10 +289,34 @@ func (s *Storage) Type(ctx context.Context, key string) string {
 		return "string"
 	case List:
 		return "list"
+	case Stream:
+		return "stream"
 	}
 
 	log.Errorf("unexpected type command key: %s for bucket type: %d", key, bucket.Type)
 	return "?"
+}
+
+func (s *Storage) AddToStreamWithCustomEntryKey(ctx context.Context, streamKey string, entryKey string, data []*StreamKvp) (string, error) {
+	if !s.doesExistingDataMatchType(streamKey, Stream) {
+		return "", types.ErrWrongType
+	}
+
+	_, ok := s.store[streamKey]
+	if !ok {
+		s.store[streamKey] = &StorageBucket{
+			Type:   Stream,
+			Stream: make(map[string][]*StreamKvp),
+		}
+	}
+
+	if _, ok := s.store[streamKey].Stream[entryKey]; ok {
+		return "", errors.New("A stream entry with same key already added")
+	}
+
+	s.store[streamKey].Stream[entryKey] = data
+
+	return entryKey, nil
 }
 
 func (s *Storage) probeExpiredValues() {

@@ -36,6 +36,7 @@ func main() {
 	lpopHandler := handler.NewLpopHandler(storage)
 	blpopHandler := handler.NewBlpopHandler(storage, bus)
 	typeHandler := handler.NewTypeHandler(storage)
+	xaddHandler := handler.NewXaddHandler(storage)
 
 	handlers := map[types.CommandName]processor.CommandHandler{
 		types.Ping:   pingHandler,
@@ -49,6 +50,7 @@ func main() {
 		types.Lpop:   lpopHandler,
 		types.Blpop:  blpopHandler,
 		types.Type:   typeHandler,
+		types.Xadd:   xaddHandler,
 	}
 
 	parser := marshal.NewParser()
