@@ -338,10 +338,11 @@ func (s *Storage) validateCustomEntryKey(streamKey string, entryKey string) erro
 	}
 
 	stream := s.store[streamKey].Stream
+	if millisecondsTime == 0 && sequenceNum == 0 {
+		return types.NewRedisError(types.GeneralError, "The ID specified in XADD must be greater than 0-0")
+	}
+
 	if len(stream) == 0 {
-		if millisecondsTime == 0 && sequenceNum == 0 {
-			return types.NewRedisError(types.GeneralError, "The ID specified in XADD must be greater than 0-0")
-		}
 		return nil
 	}
 
