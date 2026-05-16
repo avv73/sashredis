@@ -13,6 +13,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/codecrafters-io/redis-starter-go/app/types"
+	"github.com/codecrafters-io/redis-starter-go/app/utils"
 )
 
 type StoreNotifyCallback func(*types.RedisData)
@@ -41,7 +42,7 @@ type StreamEntry struct {
 }
 
 type StreamEntryKey struct {
-	Time           int
+	Time           int64
 	SequenceNumber int
 }
 
@@ -353,6 +354,10 @@ func (s *Storage) validateCustomEntryKey(streamKey string, entryKey string) (Str
 		return StreamEntryKey{}, types.NewRedisError(types.GeneralError, "The ID specified in XADD must be greater than 0-0")
 	}
 
+	if millisecondsTime == nil {
+		millisecondsTime = utils.ToPtr(time.Now().UnixMilli())
+	}
+
 	if len(stream) == 0 {
 		if sequenceNum != nil {
 			return StreamEntryKey{
@@ -396,52 +401,17 @@ func (s *Storage) validateCustomEntryKey(streamKey string, entryKey string) (Str
 	}, nil
 }
 
-// func generateEntryKey(millisecondsTime *int, sequenceNum *int, stream []StreamEntry) StreamEntryKey {
-// 	if sequenceNum == nil {
-// 		sameLatestTimeIdx := sort.Search(len(stream), func(idx int) bool {
-// 			if stream[idx].EntryId.Time == *millisecondsTime {
-// 				return true
-// 			}
-// 			return false
-// 		})
-
-// 		if sameLatestTimeIdx == len(stream) {
-// 			return StreamEntryKey{
-// 				Time:           *millisecondsTime,
-// 				SequenceNumber: 0,
-// 			}
-// 		}
-
-// 		// probe for latest
-// 		for i := sameLatestTimeIdx + 1; i < len(stream); i++ {
-// 			if stream[i].EntryId.Time == *millisecondsTime {
-// 				sameLatestTimeIdx = i
-// 				continue
-// 			}
-// 			break
-// 		}
-
-// 		return StreamEntryKey{
-// 			Time:           *millisecondsTime,
-// 			SequenceNumber: stream[sameLatestTimeIdx].EntryId.SequenceNumber + 1,
-// 		}
-
-// 	}
-
-// 	return StreamEntryKey{
-// 		Time:           *millisecondsTime,
-// 		SequenceNumber: *sequenceNum,
-// 	}
-// }
-
 // (millisecondsTime, sequenceNum)
-func parseEntryKey(entryKey string) (*int, *int, error) {
+func parseEntryKey(entryKey string) (*int64, *int, error) {
+	if entryKey == "*" {
+		return nil, nil, nil
+	}
 	tokens := strings.Split(entryKey, "-")
 	if len(tokens) != 2 {
 		return nil, nil, errors.New("expected entry key to be in format {milliseconds}-{sequenceNum}")
 	}
 
-	millisecondsTime, err := strconv.Atoi(tokens[0])
+	millisecondsTime, err := strconv.ParseInt(tokens[0], 10, 64)
 	if err != nil {
 		return nil, nil, errors.New("expected milliseconds to be valid int")
 	}
