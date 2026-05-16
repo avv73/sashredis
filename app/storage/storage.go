@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,8 +36,17 @@ type StreamKvp struct {
 }
 
 type StreamEntry struct {
-	EntryId string
+	EntryId StreamEntryKey
 	Kvps    []*StreamKvp
+}
+
+type StreamEntryKey struct {
+	Time           int
+	SequenceNumber int
+}
+
+func (s *StreamEntryKey) String() string {
+	return fmt.Sprintf("%d-%d", s.Time, s.SequenceNumber)
 }
 
 type StorageBucket struct {
@@ -317,82 +327,135 @@ func (s *Storage) AddToStreamWithCustomEntryKey(ctx context.Context, streamKey s
 		}
 	}
 
-	if err := s.validateCustomEntryKey(streamKey, entryKey); err != nil {
+	parsedEntryKey, err := s.validateCustomEntryKey(streamKey, entryKey)
+	if err != nil {
 		return "", err
 	}
 
 	s.store[streamKey].Stream = append(s.store[streamKey].Stream, StreamEntry{
-		EntryId: entryKey,
+		EntryId: parsedEntryKey,
 		Kvps:    data,
 	})
 
-	return entryKey, nil
+	return parsedEntryKey.String(), nil
 }
 
 var errInvalidXaddId = types.NewRedisError(types.GeneralError, "The ID specified in XADD is equal or smaller than the target stream top item")
 
-func (s *Storage) validateCustomEntryKey(streamKey string, entryKey string) error {
+func (s *Storage) validateCustomEntryKey(streamKey string, entryKey string) (StreamEntryKey, error) {
 	millisecondsTime, sequenceNum, err := parseEntryKey(entryKey)
 	if err != nil {
-		return err
+		return StreamEntryKey{}, err
 	}
 
 	stream := s.store[streamKey].Stream
-	if millisecondsTime == 0 && sequenceNum == 0 {
-		return types.NewRedisError(types.GeneralError, "The ID specified in XADD must be greater than 0-0")
+	if millisecondsTime != nil && *millisecondsTime == 0 && sequenceNum != nil && *sequenceNum == 0 {
+		return StreamEntryKey{}, types.NewRedisError(types.GeneralError, "The ID specified in XADD must be greater than 0-0")
 	}
 
 	if len(stream) == 0 {
-		return nil
+		if millisecondsTime != nil && *millisecondsTime == 0 {
+			return StreamEntryKey{
+				Time:           *millisecondsTime,
+				SequenceNumber: 1,
+			}, nil
+		}
+		return StreamEntryKey{
+			Time:           *millisecondsTime,
+			SequenceNumber: 0,
+		}, nil
 	}
 
 	lastEntryId := stream[len(stream)-1].EntryId
-	lastEntryIdMillisecondsTime, lastEntryIdSequenceNum, err := parseEntryKey(lastEntryId)
-	if err != nil {
-		return err
+
+	if *millisecondsTime > lastEntryId.Time {
+		return StreamEntryKey{
+			Time:           *millisecondsTime,
+			SequenceNumber: 0,
+		}, nil
 	}
 
-	if millisecondsTime > lastEntryIdMillisecondsTime {
-		return nil
+	if *millisecondsTime < lastEntryId.Time {
+		return StreamEntryKey{}, errInvalidXaddId
 	}
 
-	if millisecondsTime < lastEntryIdMillisecondsTime {
-		return errInvalidXaddId
+	if sequenceNum != nil && *sequenceNum <= lastEntryId.SequenceNumber {
+		return StreamEntryKey{}, errInvalidXaddId
 	}
 
-	if sequenceNum <= lastEntryIdSequenceNum {
-		return errInvalidXaddId
-	}
-
-	return nil
+	return StreamEntryKey{
+		Time:           *millisecondsTime,
+		SequenceNumber: lastEntryId.SequenceNumber + 1,
+	}, nil
 }
 
+// func generateEntryKey(millisecondsTime *int, sequenceNum *int, stream []StreamEntry) StreamEntryKey {
+// 	if sequenceNum == nil {
+// 		sameLatestTimeIdx := sort.Search(len(stream), func(idx int) bool {
+// 			if stream[idx].EntryId.Time == *millisecondsTime {
+// 				return true
+// 			}
+// 			return false
+// 		})
+
+// 		if sameLatestTimeIdx == len(stream) {
+// 			return StreamEntryKey{
+// 				Time:           *millisecondsTime,
+// 				SequenceNumber: 0,
+// 			}
+// 		}
+
+// 		// probe for latest
+// 		for i := sameLatestTimeIdx + 1; i < len(stream); i++ {
+// 			if stream[i].EntryId.Time == *millisecondsTime {
+// 				sameLatestTimeIdx = i
+// 				continue
+// 			}
+// 			break
+// 		}
+
+// 		return StreamEntryKey{
+// 			Time:           *millisecondsTime,
+// 			SequenceNumber: stream[sameLatestTimeIdx].EntryId.SequenceNumber + 1,
+// 		}
+
+// 	}
+
+// 	return StreamEntryKey{
+// 		Time:           *millisecondsTime,
+// 		SequenceNumber: *sequenceNum,
+// 	}
+// }
+
 // (millisecondsTime, sequenceNum)
-func parseEntryKey(entryKey string) (int, int, error) {
+func parseEntryKey(entryKey string) (*int, *int, error) {
 	tokens := strings.Split(entryKey, "-")
 	if len(tokens) != 2 {
-		return 0, 0, errors.New("expected entry key to be in format {milliseconds}-{sequenceNum}")
+		return nil, nil, errors.New("expected entry key to be in format {milliseconds}-{sequenceNum}")
 	}
 
 	millisecondsTime, err := strconv.Atoi(tokens[0])
 	if err != nil {
-		return 0, 0, errors.New("expected milliseconds to be valid int")
+		return nil, nil, errors.New("expected milliseconds to be valid int")
 	}
 
 	if millisecondsTime < 0 {
-		return 0, 0, errors.New("expected milliseconds to be non-negative")
+		return nil, nil, errors.New("expected milliseconds to be non-negative")
 	}
 
 	seqNumber, err := strconv.Atoi(tokens[1])
 	if err != nil {
-		return 0, 0, errors.New("expected sequenceNum to be valid int")
+		if tokens[1] == "*" {
+			return &millisecondsTime, nil, nil
+		}
+		return nil, nil, errors.New("expected sequenceNum to be valid int")
 	}
 
 	if seqNumber < 0 {
-		return 0, 0, errors.New("expected sequenceNum to be non-negative")
+		return nil, nil, errors.New("expected sequenceNum to be non-negative")
 	}
 
-	return millisecondsTime, seqNumber, nil
+	return &millisecondsTime, &seqNumber, nil
 }
 
 func (s *Storage) probeExpiredValues() {
