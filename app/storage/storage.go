@@ -4,6 +4,8 @@ import (
 	"container/list"
 	"context"
 	"errors"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,11 +34,16 @@ type StreamKvp struct {
 	Value string
 }
 
+type StreamEntry struct {
+	EntryId string
+	Kvps    []*StreamKvp
+}
+
 type StorageBucket struct {
 	Data     *types.RedisData
 	Type     BucketType
 	List     *list.List
-	Stream   map[string][]*StreamKvp
+	Stream   []StreamEntry
 	Metadata *StorageMetadata
 }
 
@@ -306,17 +313,85 @@ func (s *Storage) AddToStreamWithCustomEntryKey(ctx context.Context, streamKey s
 	if !ok {
 		s.store[streamKey] = &StorageBucket{
 			Type:   Stream,
-			Stream: make(map[string][]*StreamKvp),
+			Stream: make([]StreamEntry, 0),
 		}
 	}
 
-	if _, ok := s.store[streamKey].Stream[entryKey]; ok {
-		return "", errors.New("A stream entry with same key already added")
+	if err := s.validateCustomEntryKey(streamKey, entryKey); err != nil {
+		return "", err
 	}
 
-	s.store[streamKey].Stream[entryKey] = data
+	s.store[streamKey].Stream = append(s.store[streamKey].Stream, StreamEntry{
+		EntryId: entryKey,
+		Kvps:    data,
+	})
 
 	return entryKey, nil
+}
+
+var errInvalidXaddId = types.NewRedisError(types.GeneralError, "The ID specified in XADD is equal or smaller than the target stream top item")
+
+func (s *Storage) validateCustomEntryKey(streamKey string, entryKey string) error {
+	millisecondsTime, sequenceNum, err := parseEntryKey(entryKey)
+	if err != nil {
+		return err
+	}
+
+	stream := s.store[streamKey].Stream
+	if len(stream) == 0 {
+		if millisecondsTime == 0 && sequenceNum == 0 {
+			return types.NewRedisError(types.GeneralError, "The ID specified in XADD must be greater than 0-0")
+		}
+		return nil
+	}
+
+	lastEntryId := stream[len(stream)-1].EntryId
+	lastEntryIdMillisecondsTime, lastEntryIdSequenceNum, err := parseEntryKey(lastEntryId)
+	if err != nil {
+		return err
+	}
+
+	if millisecondsTime > lastEntryIdMillisecondsTime {
+		return nil
+	}
+
+	if millisecondsTime < lastEntryIdMillisecondsTime {
+		return errInvalidXaddId
+	}
+
+	if sequenceNum <= lastEntryIdSequenceNum {
+		return errInvalidXaddId
+	}
+
+	return nil
+}
+
+// (millisecondsTime, sequenceNum)
+func parseEntryKey(entryKey string) (int, int, error) {
+	tokens := strings.Split(entryKey, "-")
+	if len(tokens) != 2 {
+		return 0, 0, errors.New("expected entry key to be in format {milliseconds}-{sequenceNum}")
+	}
+
+	millisecondsTime, err := strconv.Atoi(tokens[0])
+	if err != nil {
+		return 0, 0, errors.New("expected milliseconds to be valid int")
+	}
+
+	if millisecondsTime < 0 {
+		return 0, 0, errors.New("expected milliseconds to be non-negative")
+	}
+
+	seqNumber, err := strconv.Atoi(tokens[1])
+	if err != nil {
+		return 0, 0, errors.New("expected sequenceNum to be valid int")
+	}
+
+	if seqNumber < 0 {
+		return 0, 0, errors.New("expected sequenceNum to be non-negative")
+	}
+
+	return millisecondsTime, seqNumber, nil
 }
 
 func (s *Storage) probeExpiredValues() {
