@@ -354,6 +354,13 @@ func (s *Storage) validateCustomEntryKey(streamKey string, entryKey string) (Str
 	}
 
 	if len(stream) == 0 {
+		if sequenceNum != nil {
+			return StreamEntryKey{
+				Time:           *millisecondsTime,
+				SequenceNumber: *sequenceNum,
+			}, nil
+		}
+
 		if millisecondsTime != nil && *millisecondsTime == 0 {
 			return StreamEntryKey{
 				Time:           *millisecondsTime,
