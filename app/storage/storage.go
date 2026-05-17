@@ -352,9 +352,17 @@ func (s *Storage) QueryStream(ctx context.Context, streamKey string, startId str
 		return nil, errors.New("no such stream exists")
 	}
 
-	startTime, startSeqNum, err := parseEntryKey(startId, false)
-	if err != nil {
-		return nil, err
+	var startTime *int64
+	var startSeqNum *int
+	if startId == "-" {
+		startTime = utils.ToPtr(int64(0))
+		startSeqNum = utils.ToPtr(1)
+	} else {
+		var err error
+		startTime, startSeqNum, err = parseEntryKey(startId, false)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if startTime == nil {
@@ -380,14 +388,6 @@ func (s *Storage) QueryStream(ctx context.Context, streamKey string, startId str
 
 	stream := s.store[streamKey]
 
-	// startIdx := sort.Search(len(stream.Stream), func(i int) bool {
-	// 	if stream.Stream[i].EntryId.Time < *startTime {
-	// 		return true
-	// 	}
-
-	// 	return stream.Stream[i].EntryId.Time == *startTime && stream.Stream[i].EntryId.SequenceNumber <= *startSeqNum
-	// })
-
 	startIdx, _ := sort.Find(len(stream.Stream), func(i int) int {
 		if stream.Stream[i].EntryId.Time < *startTime {
 			return 1
@@ -403,18 +403,6 @@ func (s *Storage) QueryStream(ctx context.Context, streamKey string, startId str
 		}
 		return 0
 	})
-
-	// // probe more on the right
-	// for i := startIdx + 1; i < len(stream.Stream); i++ {
-	// 	if stream.Stream[i].EntryId.Time > *startTime {
-	// 		break
-	// 	}
-	// 	if stream.Stream[i].EntryId.Time == *startTime && stream.Stream[i].EntryId.SequenceNumber > *startSeqNum {
-	// 		break
-	// 	}
-
-	// 	startIdx = i
-	// }
 
 	if startIdx == len(stream.Stream) {
 		return []*types.RedisData{}, nil
@@ -436,25 +424,6 @@ func (s *Storage) QueryStream(ctx context.Context, streamKey string, startId str
 		return 0
 	})
 
-	// endIdx := sort.Search(len(stream.Stream), func(i int) bool {
-	// 	if stream.Stream[i].EntryId.Time > *endTime {
-	// 		return true
-	// 	}
-
-	// 	return stream.Stream[i].EntryId.Time == *endTime && stream.Stream[i].EntryId.SequenceNumber >= *endSeqNum
-	// })
-
-	// // probe more on the left
-	// for i := endIdx - 1; i >= 0; i-- {
-	// 	if stream.Stream[i].EntryId.Time < *endTime {
-	// 		break
-	// 	}
-	// 	if stream.Stream[i].EntryId.Time == *endTime && stream.Stream[i].EntryId.SequenceNumber < *endSeqNum {
-	// 		break
-	// 	}
-
-	// 	endIdx = i
-	// }
 	if !hasEnd && *endSeqNum == math.MaxInt {
 		endIdx -= 1
 	}
