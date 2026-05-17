@@ -373,9 +373,18 @@ func (s *Storage) QueryStream(ctx context.Context, streamKey string, startId str
 		startSeqNum = utils.ToPtr(0)
 	}
 
-	endTime, endSeqNum, err := parseEntryKey(endId, false)
-	if err != nil {
-		return nil, err
+	var endTime *int64
+	var endSeqNum *int
+	if endId == "+" {
+		lastEl := s.store[streamKey].Stream[len(s.store[streamKey].Stream)-1]
+		endTime = utils.ToPtr(lastEl.EntryId.Time)
+		endSeqNum = utils.ToPtr(lastEl.EntryId.SequenceNumber)
+	} else {
+		var err error
+		endTime, endSeqNum, err = parseEntryKey(endId, false)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if endTime == nil {
