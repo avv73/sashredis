@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -341,10 +343,163 @@ func (s *Storage) AddToStreamWithCustomEntryKey(ctx context.Context, streamKey s
 	return parsedEntryKey.String(), nil
 }
 
+func (s *Storage) QueryStream(ctx context.Context, streamKey string, startId string, endId string) ([]*types.RedisData, error) {
+	if !s.doesExistingDataMatchType(streamKey, Stream) {
+		return nil, types.ErrWrongType
+	}
+
+	if _, ok := s.store[streamKey]; !ok {
+		return nil, errors.New("no such stream exists")
+	}
+
+	startTime, startSeqNum, err := parseEntryKey(startId, false)
+	if err != nil {
+		return nil, err
+	}
+
+	if startTime == nil {
+		return nil, errors.New("start time expected")
+	}
+
+	if startSeqNum == nil {
+		startSeqNum = utils.ToPtr(0)
+	}
+
+	endTime, endSeqNum, err := parseEntryKey(endId, false)
+	if err != nil {
+		return nil, err
+	}
+
+	if endTime == nil {
+		return nil, errors.New("end time expected")
+	}
+
+	if endSeqNum == nil {
+		endSeqNum = utils.ToPtr(math.MaxInt)
+	}
+
+	stream := s.store[streamKey]
+
+	// startIdx := sort.Search(len(stream.Stream), func(i int) bool {
+	// 	if stream.Stream[i].EntryId.Time < *startTime {
+	// 		return true
+	// 	}
+
+	// 	return stream.Stream[i].EntryId.Time == *startTime && stream.Stream[i].EntryId.SequenceNumber <= *startSeqNum
+	// })
+
+	startIdx, _ := sort.Find(len(stream.Stream), func(i int) int {
+		if stream.Stream[i].EntryId.Time < *startTime {
+			return 1
+		}
+		if stream.Stream[i].EntryId.Time > *startTime {
+			return -1
+		}
+		if stream.Stream[i].EntryId.SequenceNumber < *startSeqNum {
+			return 1
+		}
+		if stream.Stream[i].EntryId.SequenceNumber > *startSeqNum {
+			return -1
+		}
+		return 0
+	})
+
+	// // probe more on the right
+	// for i := startIdx + 1; i < len(stream.Stream); i++ {
+	// 	if stream.Stream[i].EntryId.Time > *startTime {
+	// 		break
+	// 	}
+	// 	if stream.Stream[i].EntryId.Time == *startTime && stream.Stream[i].EntryId.SequenceNumber > *startSeqNum {
+	// 		break
+	// 	}
+
+	// 	startIdx = i
+	// }
+
+	if startIdx == len(stream.Stream) {
+		return []*types.RedisData{}, nil
+	}
+
+	endIdx, hasEnd := sort.Find(len(stream.Stream), func(i int) int {
+		if stream.Stream[i].EntryId.Time < *endTime {
+			return 1
+		}
+		if stream.Stream[i].EntryId.Time > *endTime {
+			return -1
+		}
+		if stream.Stream[i].EntryId.SequenceNumber < *endSeqNum {
+			return 1
+		}
+		if stream.Stream[i].EntryId.SequenceNumber > *endSeqNum {
+			return -1
+		}
+		return 0
+	})
+
+	// endIdx := sort.Search(len(stream.Stream), func(i int) bool {
+	// 	if stream.Stream[i].EntryId.Time > *endTime {
+	// 		return true
+	// 	}
+
+	// 	return stream.Stream[i].EntryId.Time == *endTime && stream.Stream[i].EntryId.SequenceNumber >= *endSeqNum
+	// })
+
+	// // probe more on the left
+	// for i := endIdx - 1; i >= 0; i-- {
+	// 	if stream.Stream[i].EntryId.Time < *endTime {
+	// 		break
+	// 	}
+	// 	if stream.Stream[i].EntryId.Time == *endTime && stream.Stream[i].EntryId.SequenceNumber < *endSeqNum {
+	// 		break
+	// 	}
+
+	// 	endIdx = i
+	// }
+	if !hasEnd && *endSeqNum == math.MaxInt {
+		endIdx -= 1
+	}
+
+	if endIdx == len(stream.Stream) {
+		return []*types.RedisData{}, nil
+	}
+
+	elements := stream.Stream[startIdx : endIdx+1]
+	results := make([]*types.RedisData, 0, endIdx-startIdx+1)
+	for _, element := range elements {
+		kvps := &types.RedisData{
+			Type:  types.Array,
+			Holds: make([]*types.RedisData, 0, len(element.Kvps)),
+		}
+		for _, kvp := range element.Kvps {
+			kvps.Holds = append(kvps.Holds, &types.RedisData{
+				Type: types.BString,
+				Data: kvp.Key,
+			})
+			kvps.Holds = append(kvps.Holds, &types.RedisData{
+				Type: types.BString,
+				Data: kvp.Value,
+			})
+		}
+
+		results = append(results, &types.RedisData{
+			Type: types.Array,
+			Holds: []*types.RedisData{
+				&types.RedisData{
+					Type: types.BString,
+					Data: element.EntryId.String(),
+				},
+				kvps,
+			},
+		})
+	}
+
+	return results, nil
+}
+
 var errInvalidXaddId = types.NewRedisError(types.GeneralError, "The ID specified in XADD is equal or smaller than the target stream top item")
 
 func (s *Storage) validateCustomEntryKey(streamKey string, entryKey string) (StreamEntryKey, error) {
-	millisecondsTime, sequenceNum, err := parseEntryKey(entryKey)
+	millisecondsTime, sequenceNum, err := parseEntryKey(entryKey, true)
 	if err != nil {
 		return StreamEntryKey{}, err
 	}
@@ -402,12 +557,12 @@ func (s *Storage) validateCustomEntryKey(streamKey string, entryKey string) (Str
 }
 
 // (millisecondsTime, sequenceNum)
-func parseEntryKey(entryKey string) (*int64, *int, error) {
+func parseEntryKey(entryKey string, strict bool) (*int64, *int, error) {
 	if entryKey == "*" {
 		return nil, nil, nil
 	}
 	tokens := strings.Split(entryKey, "-")
-	if len(tokens) != 2 {
+	if len(tokens) != 2 && strict {
 		return nil, nil, errors.New("expected entry key to be in format {milliseconds}-{sequenceNum}")
 	}
 
@@ -418,6 +573,10 @@ func parseEntryKey(entryKey string) (*int64, *int, error) {
 
 	if millisecondsTime < 0 {
 		return nil, nil, errors.New("expected milliseconds to be non-negative")
+	}
+
+	if len(tokens) != 2 {
+		return &millisecondsTime, nil, nil
 	}
 
 	seqNumber, err := strconv.Atoi(tokens[1])

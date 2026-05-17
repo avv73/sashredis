@@ -20,6 +20,7 @@ const (
 	Blpop  CommandName = "BLPOP"
 	Type   CommandName = "TYPE"
 	Xadd   CommandName = "XADD"
+	Xrange CommandName = "XRANGE"
 )
 
 type DataType int
