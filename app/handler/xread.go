@@ -37,7 +37,7 @@ func (x *XreadHandler) HandleCommand(ctx context.Context, command *types.Command
 
 	var entryStartIdx int
 	for i, arg := range command.Args[1:] {
-		if x.storage.Type(ctx, arg.Data) != storage.StorageTypeStream {
+		if x.storage.Type(ctx, arg.Data) != storage.StorageTypeStream && x.isEntryId(arg.Data) {
 			entryStartIdx = i
 			break
 		}
@@ -57,4 +57,9 @@ func (x *XreadHandler) HandleCommand(ctx context.Context, command *types.Command
 		Type:  types.Array,
 		Holds: result,
 	}, nil
+}
+
+func (x *XreadHandler) isEntryId(input string) bool {
+	ms, seq, err := types.ParseStreamEntryKey(input, true)
+	return err == nil && ms != nil && seq != nil
 }

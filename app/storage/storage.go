@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"math"
 	"sort"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -415,7 +413,7 @@ func (s *Storage) QueryStream(ctx context.Context, streamKey string, startId str
 		startSeqNum = utils.ToPtr(1)
 	} else {
 		var err error
-		startTime, startSeqNum, err = parseEntryKey(startId, false)
+		startTime, startSeqNum, err = types.ParseStreamEntryKey(startId, false)
 		if err != nil {
 			return nil, err
 		}
@@ -437,7 +435,7 @@ func (s *Storage) QueryStream(ctx context.Context, streamKey string, startId str
 		endSeqNum = utils.ToPtr(lastEl.EntryId.SequenceNumber)
 	} else {
 		var err error
-		endTime, endSeqNum, err = parseEntryKey(endId, false)
+		endTime, endSeqNum, err = types.ParseStreamEntryKey(endId, false)
 		if err != nil {
 			return nil, err
 		}
@@ -494,7 +492,7 @@ func (s *Storage) ReadStream(ctx context.Context, streamKeys []string, ids []str
 		}
 
 		stream := s.store[streamKey]
-		startTime, startSeqNum, err := parseEntryKey(ids[i], true)
+		startTime, startSeqNum, err := types.ParseStreamEntryKey(ids[i], true)
 		if err != nil {
 			return nil, fmt.Errorf("expected a valid key: %w", err)
 		}
@@ -507,13 +505,7 @@ func (s *Storage) ReadStream(ctx context.Context, streamKeys []string, ids []str
 			startIdx++ // offset by one if we find the match, it is exclusive of the exact element
 		}
 
-		elements := stream.Stream[startIdx:]
-		elementsResults := &types.RedisData{Type: types.Array, Holds: make([]*types.RedisData, 0, len(elements))}
-
-		for _, element := range elements {
-			elementsResults.Holds = append(elementsResults.Holds, element.ToRedisData())
-		}
-
+		elementsResults := &types.RedisData{Type: types.Array}
 		streamResults := &types.RedisData{
 			Type: types.Array,
 			Holds: []*types.RedisData{
@@ -525,6 +517,19 @@ func (s *Storage) ReadStream(ctx context.Context, streamKeys []string, ids []str
 			},
 		}
 		results = append(results, streamResults)
+
+		if startIdx >= len(stream.Stream) {
+			elementsResults.Type = types.NullArray
+			continue
+		}
+
+		elements := stream.Stream[startIdx:]
+		elementsResults.Holds = make([]*types.RedisData, 0, len(elements))
+
+		for _, element := range elements {
+			elementsResults.Holds = append(elementsResults.Holds, element.ToRedisData())
+		}
+
 	}
 
 	return results, nil
@@ -533,7 +538,7 @@ func (s *Storage) ReadStream(ctx context.Context, streamKeys []string, ids []str
 var errInvalidXaddId = types.NewRedisError(types.GeneralError, "The ID specified in XADD is equal or smaller than the target stream top item")
 
 func (s *Storage) validateCustomEntryKey(streamKey string, entryKey string) (StreamEntryKey, error) {
-	millisecondsTime, sequenceNum, err := parseEntryKey(entryKey, true)
+	millisecondsTime, sequenceNum, err := types.ParseStreamEntryKey(entryKey, true)
 	if err != nil {
 		return StreamEntryKey{}, err
 	}
@@ -588,44 +593,6 @@ func (s *Storage) validateCustomEntryKey(streamKey string, entryKey string) (Str
 		Time:           *millisecondsTime,
 		SequenceNumber: lastEntryId.SequenceNumber + 1,
 	}, nil
-}
-
-// (millisecondsTime, sequenceNum)
-func parseEntryKey(entryKey string, strict bool) (*int64, *int, error) {
-	if entryKey == "*" {
-		return nil, nil, nil
-	}
-	tokens := strings.Split(entryKey, "-")
-	if len(tokens) != 2 && strict {
-		return nil, nil, errors.New("expected entry key to be in format {milliseconds}-{sequenceNum}")
-	}
-
-	millisecondsTime, err := strconv.ParseInt(tokens[0], 10, 64)
-	if err != nil {
-		return nil, nil, errors.New("expected milliseconds to be valid int")
-	}
-
-	if millisecondsTime < 0 {
-		return nil, nil, errors.New("expected milliseconds to be non-negative")
-	}
-
-	if len(tokens) != 2 {
-		return &millisecondsTime, nil, nil
-	}
-
-	seqNumber, err := strconv.Atoi(tokens[1])
-	if err != nil {
-		if tokens[1] == "*" {
-			return &millisecondsTime, nil, nil
-		}
-		return nil, nil, errors.New("expected sequenceNum to be valid int")
-	}
-
-	if seqNumber < 0 {
-		return nil, nil, errors.New("expected sequenceNum to be non-negative")
-	}
-
-	return &millisecondsTime, &seqNumber, nil
 }
 
 func (s *Storage) probeExpiredValues() {
