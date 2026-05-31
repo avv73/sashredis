@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 
+	"github.com/codecrafters-io/redis-starter-go/app/storage"
 	"github.com/codecrafters-io/redis-starter-go/app/types"
 )
 
 type TyperStorage interface {
-	Type(ctx context.Context, key string) string
+	Type(ctx context.Context, key string) storage.StorageType
 }
 
 type TypeHandler struct {
@@ -27,7 +28,7 @@ func (t *TypeHandler) HandleCommand(ctx context.Context, command *types.Command)
 	}
 
 	key := command.Args[0]
-	typ := t.storage.Type(ctx, key.Data)
+	typ := string(t.storage.Type(ctx, key.Data))
 
 	return &types.RedisData{
 		Type: types.SString,

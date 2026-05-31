@@ -5,11 +5,13 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/codecrafters-io/redis-starter-go/app/storage"
 	"github.com/codecrafters-io/redis-starter-go/app/types"
 )
 
 type XreadStorage interface {
-	ReadStream(ctx context.Context, streamKey string, id string) ([]*types.RedisData, error)
+	ReadStream(ctx context.Context, streamKeys []string, ids []string) ([]*types.RedisData, error)
+	Type(ctx context.Context, key string) storage.StorageType
 }
 
 type XreadHandler struct {
@@ -23,17 +25,30 @@ func NewXreadHandler(storage XreadStorage) *XreadHandler {
 }
 
 func (x *XreadHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
-	if len(command.Args) != 3 {
+	if len(command.Args) < 3 {
 		return nil, errors.New("unexpected number of arguments")
 	}
 	if strings.ToLower(command.Args[0].Data) != "streams" {
 		return nil, errors.New("expected first arg to be STREAMS")
 	}
 
-	streamKey := command.Args[1].Data
-	entryId := command.Args[2].Data
+	streamKeys := make([]string, 0)
+	entryIds := make([]string, 0)
 
-	result, err := x.storage.ReadStream(ctx, streamKey, entryId)
+	var entryStartIdx int
+	for i, arg := range command.Args {
+		if x.storage.Type(ctx, arg.Data) != storage.StorageTypeStream {
+			entryStartIdx = i
+			break
+		}
+		streamKeys = append(streamKeys, arg.Data)
+	}
+
+	for _, entryId := range command.Args[entryStartIdx:] {
+		entryIds = append(entryIds, entryId.Data)
+	}
+
+	result, err := x.storage.ReadStream(ctx, streamKeys, entryIds)
 	if err != nil {
 		return nil, err
 	}

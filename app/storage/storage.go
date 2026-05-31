@@ -327,7 +327,16 @@ func (s *Storage) SchedulePopList(ctx context.Context, key string, timeout float
 	return nil
 }
 
-func (s *Storage) Type(ctx context.Context, key string) string {
+type StorageType string
+
+const (
+	StorageTypeString  StorageType = "string"
+	StorageTypeList    StorageType = "list"
+	StorageTypeStream  StorageType = "stream"
+	StorageTypeUnknown StorageType = "?"
+)
+
+func (s *Storage) Type(ctx context.Context, key string) StorageType {
 	bucket, ok := s.store[key]
 	if !ok {
 		return "none"
@@ -335,15 +344,15 @@ func (s *Storage) Type(ctx context.Context, key string) string {
 
 	switch bucket.Type {
 	case Value:
-		return "string"
+		return StorageTypeString
 	case List:
-		return "list"
+		return StorageTypeList
 	case Stream:
-		return "stream"
+		return StorageTypeStream
 	}
 
 	log.Errorf("unexpected type command key: %s for bucket type: %d", key, bucket.Type)
-	return "?"
+	return StorageTypeUnknown
 }
 
 func (s *Storage) AddToStreamWithCustomEntryKey(ctx context.Context, streamKey string, entryKey string, data []*StreamKvp) (string, error) {
@@ -469,49 +478,53 @@ func (s *Storage) QueryStream(ctx context.Context, streamKey string, startId str
 	return results, nil
 }
 
-func (s *Storage) ReadStream(ctx context.Context, streamKey string, id string) ([]*types.RedisData, error) {
-	if !s.doesExistingDataMatchType(streamKey, Stream) {
-		return nil, types.ErrWrongType
+func (s *Storage) ReadStream(ctx context.Context, streamKeys []string, ids []string) ([]*types.RedisData, error) {
+	if len(streamKeys) != len(ids) {
+		return nil, errors.New("expected equal number of keys and ids")
 	}
 
-	if _, ok := s.store[streamKey]; !ok {
-		return nil, errors.New("no such stream exists")
-	}
+	results := make([]*types.RedisData, 0, len(streamKeys))
+	for i, streamKey := range streamKeys {
+		if !s.doesExistingDataMatchType(streamKey, Stream) {
+			return nil, types.ErrWrongType
+		}
 
-	stream := s.store[streamKey]
-	startTime, startSeqNum, err := parseEntryKey(id, true)
-	if err != nil {
-		return nil, fmt.Errorf("expected a valid key: %w", err)
-	}
-	if startTime == nil || startSeqNum == nil {
-		return nil, errors.New("expected time or sequence num")
-	}
-	startIdx, found := sort.Find(len(stream.Stream), filterFunc(stream, *startTime, *startSeqNum))
+		if _, ok := s.store[streamKey]; !ok {
+			return nil, errors.New("no such stream exists")
+		}
 
-	if found {
-		startIdx++ // offset by one if we find the match, it is exclusive of the exact element
-	}
+		stream := s.store[streamKey]
+		startTime, startSeqNum, err := parseEntryKey(ids[i], true)
+		if err != nil {
+			return nil, fmt.Errorf("expected a valid key: %w", err)
+		}
+		if startTime == nil || startSeqNum == nil {
+			return nil, errors.New("expected time or sequence num")
+		}
+		startIdx, found := sort.Find(len(stream.Stream), filterFunc(stream, *startTime, *startSeqNum))
 
-	elements := stream.Stream[startIdx:]
-	elementsResults := &types.RedisData{Type: types.Array, Holds: make([]*types.RedisData, 0, len(elements))}
+		if found {
+			startIdx++ // offset by one if we find the match, it is exclusive of the exact element
+		}
 
-	for _, element := range elements {
-		elementsResults.Holds = append(elementsResults.Holds, element.ToRedisData())
-	}
+		elements := stream.Stream[startIdx:]
+		elementsResults := &types.RedisData{Type: types.Array, Holds: make([]*types.RedisData, 0, len(elements))}
 
-	streamResults := &types.RedisData{
-		Type: types.Array,
-		Holds: []*types.RedisData{
-			&types.RedisData{
-				Type: types.BString,
-				Data: streamKey,
+		for _, element := range elements {
+			elementsResults.Holds = append(elementsResults.Holds, element.ToRedisData())
+		}
+
+		streamResults := &types.RedisData{
+			Type: types.Array,
+			Holds: []*types.RedisData{
+				&types.RedisData{
+					Type: types.BString,
+					Data: streamKey,
+				},
+				elementsResults,
 			},
-			elementsResults,
-		},
-	}
-
-	results := []*types.RedisData{
-		streamResults,
+		}
+		results = append(results, streamResults)
 	}
 
 	return results, nil
