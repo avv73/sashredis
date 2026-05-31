@@ -44,7 +44,7 @@ func (x *XreadHandler) HandleCommand(ctx context.Context, command *types.Command
 		streamKeys = append(streamKeys, arg.Data)
 	}
 
-	for _, entryId := range command.Args[entryStartIdx:] {
+	for _, entryId := range command.Args[entryStartIdx+1:] {
 		entryIds = append(entryIds, entryId.Data)
 	}
 
