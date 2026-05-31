@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/codecrafters-io/redis-starter-go/app/types"
 )
@@ -25,7 +26,7 @@ func (x *XreadHandler) HandleCommand(ctx context.Context, command *types.Command
 	if len(command.Args) != 3 {
 		return nil, errors.New("unexpected number of arguments")
 	}
-	if command.Args[0].Data != "STREAMS" {
+	if strings.ToLower(command.Args[0].Data) != "streams" {
 		return nil, errors.New("expected first arg to be STREAMS")
 	}
 
