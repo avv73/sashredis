@@ -43,6 +43,35 @@ type StreamEntry struct {
 	Kvps    []*StreamKvp
 }
 
+func (s *StreamEntry) ToRedisData() *types.RedisData {
+	kvps := &types.RedisData{
+		Type:  types.Array,
+		Holds: make([]*types.RedisData, 0, len(s.Kvps)),
+	}
+	for _, kvp := range s.Kvps {
+		kvps.Holds = append(kvps.Holds, &types.RedisData{
+			Type: types.BString,
+			Data: kvp.Key,
+		})
+		kvps.Holds = append(kvps.Holds, &types.RedisData{
+			Type: types.BString,
+			Data: kvp.Value,
+		})
+	}
+
+	result := &types.RedisData{
+		Type: types.Array,
+		Holds: []*types.RedisData{
+			&types.RedisData{
+				Type: types.BString,
+				Data: s.EntryId.String(),
+			},
+			kvps,
+		},
+	}
+	return result
+}
+
 type StreamEntryKey struct {
 	Time           int64
 	SequenceNumber int
@@ -343,6 +372,24 @@ func (s *Storage) AddToStreamWithCustomEntryKey(ctx context.Context, streamKey s
 	return parsedEntryKey.String(), nil
 }
 
+var filterFunc = func(stream *StorageBucket, filterTime int64, filterSeqNum int) func(i int) int {
+	return func(i int) int {
+		if stream.Stream[i].EntryId.Time < filterTime {
+			return 1
+		}
+		if stream.Stream[i].EntryId.Time > filterTime {
+			return -1
+		}
+		if stream.Stream[i].EntryId.SequenceNumber < filterSeqNum {
+			return 1
+		}
+		if stream.Stream[i].EntryId.SequenceNumber > filterSeqNum {
+			return -1
+		}
+		return 0
+	}
+}
+
 func (s *Storage) QueryStream(ctx context.Context, streamKey string, startId string, endId string) ([]*types.RedisData, error) {
 	if !s.doesExistingDataMatchType(streamKey, Stream) {
 		return nil, types.ErrWrongType
@@ -397,41 +444,13 @@ func (s *Storage) QueryStream(ctx context.Context, streamKey string, startId str
 
 	stream := s.store[streamKey]
 
-	startIdx, _ := sort.Find(len(stream.Stream), func(i int) int {
-		if stream.Stream[i].EntryId.Time < *startTime {
-			return 1
-		}
-		if stream.Stream[i].EntryId.Time > *startTime {
-			return -1
-		}
-		if stream.Stream[i].EntryId.SequenceNumber < *startSeqNum {
-			return 1
-		}
-		if stream.Stream[i].EntryId.SequenceNumber > *startSeqNum {
-			return -1
-		}
-		return 0
-	})
+	startIdx, _ := sort.Find(len(stream.Stream), filterFunc(stream, *startTime, *startSeqNum))
 
 	if startIdx == len(stream.Stream) {
 		return []*types.RedisData{}, nil
 	}
 
-	endIdx, hasEnd := sort.Find(len(stream.Stream), func(i int) int {
-		if stream.Stream[i].EntryId.Time < *endTime {
-			return 1
-		}
-		if stream.Stream[i].EntryId.Time > *endTime {
-			return -1
-		}
-		if stream.Stream[i].EntryId.SequenceNumber < *endSeqNum {
-			return 1
-		}
-		if stream.Stream[i].EntryId.SequenceNumber > *endSeqNum {
-			return -1
-		}
-		return 0
-	})
+	endIdx, hasEnd := sort.Find(len(stream.Stream), filterFunc(stream, *endTime, *endSeqNum))
 
 	if !hasEnd && *endSeqNum == math.MaxInt {
 		endIdx -= 1
@@ -444,31 +463,55 @@ func (s *Storage) QueryStream(ctx context.Context, streamKey string, startId str
 	elements := stream.Stream[startIdx : endIdx+1]
 	results := make([]*types.RedisData, 0, endIdx-startIdx+1)
 	for _, element := range elements {
-		kvps := &types.RedisData{
-			Type:  types.Array,
-			Holds: make([]*types.RedisData, 0, len(element.Kvps)),
-		}
-		for _, kvp := range element.Kvps {
-			kvps.Holds = append(kvps.Holds, &types.RedisData{
-				Type: types.BString,
-				Data: kvp.Key,
-			})
-			kvps.Holds = append(kvps.Holds, &types.RedisData{
-				Type: types.BString,
-				Data: kvp.Value,
-			})
-		}
+		results = append(results, element.ToRedisData())
+	}
 
-		results = append(results, &types.RedisData{
-			Type: types.Array,
-			Holds: []*types.RedisData{
-				&types.RedisData{
-					Type: types.BString,
-					Data: element.EntryId.String(),
-				},
-				kvps,
+	return results, nil
+}
+
+func (s *Storage) ReadStream(ctx context.Context, streamKey string, id string) ([]*types.RedisData, error) {
+	if !s.doesExistingDataMatchType(streamKey, Stream) {
+		return nil, types.ErrWrongType
+	}
+
+	if _, ok := s.store[streamKey]; !ok {
+		return nil, errors.New("no such stream exists")
+	}
+
+	stream := s.store[streamKey]
+	startTime, startSeqNum, err := parseEntryKey(id, true)
+	if err != nil {
+		return nil, fmt.Errorf("expected a valid key: %w", err)
+	}
+	if startTime == nil || startSeqNum == nil {
+		return nil, errors.New("expected time or sequence num")
+	}
+	startIdx, found := sort.Find(len(stream.Stream), filterFunc(stream, *startTime, *startSeqNum))
+
+	if found {
+		startIdx++ // offset by one if we find the match, it is exclusive of the exact element
+	}
+
+	elements := stream.Stream[startIdx:]
+	elementsResults := &types.RedisData{Type: types.Array, Holds: make([]*types.RedisData, 0, len(elements))}
+
+	for _, element := range elements {
+		elementsResults.Holds = append(elementsResults.Holds, element.ToRedisData())
+	}
+
+	streamResults := &types.RedisData{
+		Type: types.Array,
+		Holds: []*types.RedisData{
+			&types.RedisData{
+				Type: types.BString,
+				Data: streamKey,
 			},
-		})
+			elementsResults,
+		},
+	}
+
+	results := []*types.RedisData{
+		streamResults,
 	}
 
 	return results, nil

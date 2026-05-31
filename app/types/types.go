@@ -21,6 +21,7 @@ const (
 	Type   CommandName = "TYPE"
 	Xadd   CommandName = "XADD"
 	Xrange CommandName = "XRANGE"
+	Xread  CommandName = "XREAD"
 )
 
 type DataType int
