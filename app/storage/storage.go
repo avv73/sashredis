@@ -16,7 +16,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/utils"
 )
 
-type StoreNotifyCallback func(*types.RedisData)
+type StoreNotifyCallback func(key string, data *types.RedisData)
 
 type Storage struct {
 	store       map[string]*StorageBucket
@@ -171,7 +171,7 @@ func (s *Storage) AppendToList(key string, data *types.RedisData) (int, error) {
 
 	s.store[key].List.PushBack(data)
 
-	defer s.notify(key, data)
+	defer s.notifyFirst(key, data)
 	return s.store[key].List.Len(), nil
 }
 
@@ -189,7 +189,7 @@ func (s *Storage) PrependToList(key string, data *types.RedisData) (int, error) 
 	}
 
 	s.store[key].List.PushFront(data)
-	s.notify(key, data)
+	s.notifyFirst(key, data)
 
 	return s.store[key].List.Len(), nil
 }
@@ -293,7 +293,7 @@ func (s *Storage) SchedulePopList(ctx context.Context, key string, timeout float
 
 	doneCtx, cancel := context.WithCancel(ctx)
 	var once sync.Once
-	notifyCallback := func(data *types.RedisData) {
+	notifyCallback := func(key string, data *types.RedisData) {
 		cancel()
 		once.Do(func() {
 			bucket, ok := s.store[key]
@@ -371,10 +371,13 @@ func (s *Storage) AddToStreamWithCustomEntryKey(ctx context.Context, streamKey s
 		return "", err
 	}
 
-	s.store[streamKey].Stream = append(s.store[streamKey].Stream, StreamEntry{
+	entry := StreamEntry{
 		EntryId: parsedEntryKey,
 		Kvps:    data,
-	})
+	}
+
+	s.store[streamKey].Stream = append(s.store[streamKey].Stream, entry)
+	s.notifyAll(streamKey, entry.ToRedisData())
 
 	return parsedEntryKey.String(), nil
 }
@@ -488,7 +491,7 @@ func (s *Storage) ReadStream(ctx context.Context, streamKeys []string, ids []str
 		}
 
 		if _, ok := s.store[streamKey]; !ok {
-			return nil, errors.New("no such stream exists")
+			continue
 		}
 
 		stream := s.store[streamKey]
@@ -533,6 +536,61 @@ func (s *Storage) ReadStream(ctx context.Context, streamKeys []string, ids []str
 	}
 
 	return results, nil
+}
+
+func (s *Storage) ScheduleReadStream(ctx context.Context, streamKeys []string, ids []string, timeout int64, callback func([]*types.RedisData, bool)) error {
+	if timeout < 0 {
+		return errors.New("expected positive timeout")
+	}
+
+	for _, key := range streamKeys {
+		if !s.doesExistingDataMatchType(key, List) {
+			return types.ErrWrongType
+		}
+
+		if _, ok := s.storeNotify[key]; !ok {
+			s.storeNotify[key] = make([]StoreNotifyCallback, 0, 1)
+		}
+	}
+
+	doneCtx, cancel := context.WithCancel(ctx)
+	var once sync.Once
+	notifyCallback := func(key string, data *types.RedisData) {
+		cancel()
+		once.Do(func() {
+			result, err := s.ReadStream(ctx, streamKeys, ids)
+			if err != nil {
+				log.WithError(err).Error("caught error when notified for new key")
+				callback(nil, false)
+				return
+			}
+
+			for _, lkey := range streamKeys {
+				s.unsubscribe(lkey)
+			}
+
+			callback(result, true)
+		})
+	}
+	for _, key := range streamKeys {
+		s.storeNotify[key] = append(s.storeNotify[key], notifyCallback)
+	}
+
+	if timeout != 0 {
+		go func() {
+			timeoutTimer := time.NewTimer(time.Duration(timeout) * time.Millisecond)
+			select {
+			case <-timeoutTimer.C:
+				once.Do(func() {
+					callback(nil, false)
+				})
+			case <-doneCtx.Done():
+				return
+			}
+		}()
+	}
+	return nil
+
 }
 
 var errInvalidXaddId = types.NewRedisError(types.GeneralError, "The ID specified in XADD is equal or smaller than the target stream top item")
@@ -622,9 +680,24 @@ func (s *Storage) doesExistingDataMatchType(key string, targetType BucketType) b
 	return val.Type == targetType
 }
 
-func (s *Storage) notify(key string, data *types.RedisData) {
+func (s *Storage) notifyFirst(key string, data *types.RedisData) {
 	if subs, ok := s.storeNotify[key]; ok {
-		subs[0](data)
+		subs[0](key, data)
+		s.unsubscribe(key)
+	}
+}
+
+func (s *Storage) notifyAll(key string, data *types.RedisData) {
+	if subs, ok := s.storeNotify[key]; ok {
+		for _, sub := range subs {
+			sub(key, data)
+			s.unsubscribe(key)
+		}
+	}
+}
+
+func (s *Storage) unsubscribe(key string) {
+	if subs, ok := s.storeNotify[key]; ok {
 		if len(subs) == 1 {
 			delete(s.storeNotify, key)
 		} else {

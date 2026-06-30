@@ -38,7 +38,7 @@ func main() {
 	typeHandler := handler.NewTypeHandler(storage)
 	xaddHandler := handler.NewXaddHandler(storage)
 	xrangeHandler := handler.NewXrangeHandler(storage)
-	xreadHandler := handler.NewXreadHandler(storage)
+	xreadHandler := handler.NewXreadHandler(storage, bus)
 
 	handlers := map[types.CommandName]processor.CommandHandler{
 		types.Ping:   pingHandler,
