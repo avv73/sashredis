@@ -84,7 +84,7 @@ func (x *XreadHandler) HandleCommand(ctx context.Context, command *types.Command
 		return nil, err
 	}
 
-	if len(result) > 0 {
+	if !x.isEmptyReadResponse(result) {
 		return &types.RedisData{
 			Type:  types.Array,
 			Holds: result,
@@ -117,4 +117,13 @@ func (x *XreadHandler) HandleCommand(ctx context.Context, command *types.Command
 func (x *XreadHandler) isEntryId(input string) bool {
 	ms, seq, err := types.ParseStreamEntryKey(input, true)
 	return err == nil && ms != nil && seq != nil
+}
+
+func (x *XreadHandler) isEmptyReadResponse(response []*types.RedisData) bool {
+	for _, kvp := range response {
+		if kvp.Holds[1].Type != types.NullArray {
+			return false
+		}
+	}
+	return true
 }

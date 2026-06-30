@@ -544,7 +544,7 @@ func (s *Storage) ScheduleReadStream(ctx context.Context, streamKeys []string, i
 	}
 
 	for _, key := range streamKeys {
-		if !s.doesExistingDataMatchType(key, List) {
+		if !s.doesExistingDataMatchType(key, Stream) {
 			return types.ErrWrongType
 		}
 
