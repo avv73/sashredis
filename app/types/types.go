@@ -22,6 +22,7 @@ const (
 	Xadd   CommandName = "XADD"
 	Xrange CommandName = "XRANGE"
 	Xread  CommandName = "XREAD"
+	Incr   CommandName = "INCR"
 )
 
 type DataType int

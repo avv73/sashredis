@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -599,7 +600,30 @@ func (s *Storage) ScheduleReadStream(ctx context.Context, streamKeys []string, i
 		}()
 	}
 	return nil
+}
 
+func (s *Storage) Increment(ctx context.Context, key string) (*types.RedisData, error) {
+	value, ok, err := s.GetKvp(key)
+	if err != nil {
+		return nil, err
+	}
+
+	if !ok {
+		// WIP
+		return nil, nil
+	}
+	valueInt, err := strconv.ParseUint(value.Data, 10, 64)
+	if err != nil {
+		// WIP
+		return nil, nil
+	}
+
+	valueInt++
+	value.Data = strconv.FormatUint(valueInt, 10)
+	value.Type = types.Integer
+
+	s.SetKvp(ctx, key, value)
+	return value, nil
 }
 
 var errInvalidXaddId = types.NewRedisError(types.GeneralError, "The ID specified in XADD is equal or smaller than the target stream top item")

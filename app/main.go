@@ -39,6 +39,7 @@ func main() {
 	xaddHandler := handler.NewXaddHandler(storage)
 	xrangeHandler := handler.NewXrangeHandler(storage)
 	xreadHandler := handler.NewXreadHandler(storage, bus)
+	incrHandler := handler.NewIncrHandler(storage)
 
 	handlers := map[types.CommandName]processor.CommandHandler{
 		types.Ping:   pingHandler,
@@ -55,6 +56,7 @@ func main() {
 		types.Xadd:   xaddHandler,
 		types.Xrange: xrangeHandler,
 		types.Xread:  xreadHandler,
+		types.Incr:   incrHandler,
 	}
 
 	parser := marshal.NewParser()
