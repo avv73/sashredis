@@ -609,7 +609,10 @@ func (s *Storage) Increment(ctx context.Context, key string) (*types.RedisData, 
 	}
 
 	if !ok {
-		value.Data = "0"
+		value = &types.RedisData{
+			Type: types.Integer,
+			Data: "0",
+		}
 	}
 	valueInt, err := strconv.ParseUint(value.Data, 10, 64)
 	if err != nil {
