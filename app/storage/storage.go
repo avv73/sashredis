@@ -622,9 +622,9 @@ func (s *Storage) Increment(ctx context.Context, key string) (*types.RedisData, 
 
 	valueInt++
 	value.Data = strconv.FormatUint(valueInt, 10)
-	value.Type = types.Integer
 
 	s.SetKvp(ctx, key, value)
+	value.Type = types.Integer // Do not persist integer type to the underlying store, it is used only for formatting.
 	return value, nil
 }
 
