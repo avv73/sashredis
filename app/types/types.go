@@ -79,3 +79,15 @@ func (r *RedisData) String() string {
 
 	return fmt.Sprintf("%s:<data: %s> holds: [%s]", r.Type.String(), r.Data, nested.String())
 }
+
+func (r *RedisData) Clone() *RedisData {
+	new := &RedisData{
+		Data: r.Data,
+		Type: r.Type,
+	}
+
+	for _, data := range r.Holds {
+		new.Holds = append(new.Holds, data.Clone())
+	}
+	return new
+}

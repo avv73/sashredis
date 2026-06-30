@@ -624,8 +624,10 @@ func (s *Storage) Increment(ctx context.Context, key string) (*types.RedisData, 
 	value.Data = strconv.FormatUint(valueInt, 10)
 
 	s.SetKvp(ctx, key, value)
-	value.Type = types.Integer // Do not persist integer type to the underlying store, it is used only for formatting.
-	return value, nil
+
+	valueToReturn := value.Clone()
+	valueToReturn.Type = types.Integer // Do not persist integer type to the underlying store, it is used only for formatting.
+	return valueToReturn, nil
 }
 
 var errInvalidXaddId = types.NewRedisError(types.GeneralError, "The ID specified in XADD is equal or smaller than the target stream top item")
