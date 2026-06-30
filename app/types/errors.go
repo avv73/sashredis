@@ -49,6 +49,7 @@ func (r *RedisError) AsRedisData() *RedisData {
 }
 
 var ErrWrongType *RedisError = NewRedisError(WrongType, "Operation against a key holding the wrong kind of value")
+var ErrValueNotInteger *RedisError = NewRedisError(GeneralError, "value is not an integer or out of range")
 
 type BlockError struct {
 }
@@ -57,4 +58,5 @@ func (r *BlockError) Error() string {
 	return "blocking client connection"
 }
 
+// ErrBlock is a special kind of error that, when returned from a handler, signals to the event bus to immediately block the client connection and wait for Unblock from the handler.
 var ErrBlock *BlockError = &BlockError{}

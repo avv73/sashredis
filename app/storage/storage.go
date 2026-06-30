@@ -616,8 +616,7 @@ func (s *Storage) Increment(ctx context.Context, key string) (*types.RedisData, 
 	}
 	valueInt, err := strconv.ParseUint(value.Data, 10, 64)
 	if err != nil {
-		// WIP
-		return nil, nil
+		return nil, types.ErrValueNotInteger
 	}
 
 	valueInt++
