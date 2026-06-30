@@ -610,7 +610,7 @@ func (s *Storage) Increment(ctx context.Context, key string) (*types.RedisData, 
 
 	if !ok {
 		value = &types.RedisData{
-			Type: types.Integer,
+			Type: types.BString,
 			Data: "0",
 		}
 	}
