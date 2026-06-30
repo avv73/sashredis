@@ -44,7 +44,7 @@ func (x *XreadHandler) HandleCommand(ctx context.Context, command *types.Command
 		var err error
 		blockTimeoutMs, err = strconv.ParseInt(command.Args[1].Data, 10, 64)
 		if err != nil {
-			return nil, errors.New("expected timeout ms to be float")
+			return nil, errors.New("expected timeout ms to be int")
 		}
 		argsOffset += 2
 	} else if strings.ToLower(command.Args[0].Data) != "streams" {
@@ -63,11 +63,27 @@ func (x *XreadHandler) HandleCommand(ctx context.Context, command *types.Command
 		streamKeys = append(streamKeys, arg.Data)
 	}
 
+	skipInitialRead := false
 	for _, entryId := range command.Args[entryStartIdx+1+argsOffset:] {
+		if entryId.Data == "$" {
+			if !isBlocking {
+				return nil, errors.New("expected $ to be present only on blocking reads")
+			}
+			if len(command.Args[entryStartIdx+1+argsOffset:]) > 1 {
+				return nil, errors.New("expected $ to be the only entry id")
+			}
+			skipInitialRead = true
+			break
+		}
 		entryIds = append(entryIds, entryId.Data)
 	}
 
-	result, err := x.storage.ReadStream(ctx, streamKeys, entryIds)
+	var result []*types.RedisData
+	var err error
+
+	if !skipInitialRead {
+		result, err = x.storage.ReadStream(ctx, streamKeys, entryIds)
+	}
 	if !isBlocking {
 		if err != nil {
 			return nil, err
@@ -115,6 +131,9 @@ func (x *XreadHandler) HandleCommand(ctx context.Context, command *types.Command
 }
 
 func (x *XreadHandler) isEntryId(input string) bool {
+	if input == "$" {
+		return true
+	}
 	ms, seq, err := types.ParseStreamEntryKey(input, true)
 	return err == nil && ms != nil && seq != nil
 }

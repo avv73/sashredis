@@ -558,12 +558,21 @@ func (s *Storage) ScheduleReadStream(ctx context.Context, streamKeys []string, i
 	notifyCallback := func(key string, data *types.RedisData) {
 		cancel()
 		once.Do(func() {
-			result, err := s.ReadStream(ctx, streamKeys, ids)
-			if err != nil {
-				log.WithError(err).Error("caught error when notified for new key")
-				callback(nil, false)
-				return
-			}
+			result := []*types.RedisData{&types.RedisData{
+				Type: types.Array,
+				Holds: []*types.RedisData{
+					&types.RedisData{
+						Type: types.BString,
+						Data: key,
+					},
+					&types.RedisData{
+						Type: types.Array,
+						Holds: []*types.RedisData{
+							data,
+						},
+					},
+				},
+			}}
 
 			for _, lkey := range streamKeys {
 				s.unsubscribe(lkey)
