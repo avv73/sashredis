@@ -65,7 +65,7 @@ func (p *Processor) ExecuteCommand(ctx context.Context, command *types.Command) 
 
 	result, err := handler.HandleCommand(ctx, command)
 	if err != nil {
-		return nil, fmt.Errorf("command execution error: %w", err)
+		return nil, err
 	}
 
 	log.Infof("exec result: %s", result)
