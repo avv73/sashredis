@@ -31,6 +31,23 @@ func (t *TransactionManager) BeginTransaction(ctx context.Context) error {
 	return nil
 }
 
+func (t *TransactionManager) ExecuteTransaction(ctx context.Context) (*types.RedisData, error) {
+	if !t.HasTransaction(ctx) {
+		return nil, errors.New("no transaction in progress")
+	}
+	transactions := t.transactions[exctx.FromContext(ctx).ConnectionId]
+	delete(t.transactions, exctx.FromContext(ctx).ConnectionId)
+
+	if len(transactions) == 0 {
+		return &types.RedisData{
+			Type:  types.Array,
+			Holds: make([]*types.RedisData, 0),
+		}, nil
+	}
+
+	return nil, nil // TODO
+}
+
 func (t *TransactionManager) AddToTransaction(ctx context.Context, command *types.Command) error {
 	if !t.HasTransaction(ctx) {
 		return errors.New("no transaction in progress")

@@ -17,15 +17,22 @@ type CommandHandler interface {
 	HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error)
 }
 
-type Processor struct {
-	eventBus EventBusPublisher
-	handlers map[types.CommandName]CommandHandler
+type TransactionController interface {
+	HasTransaction(ctx context.Context) bool
+	AddToTransaction(ctx context.Context, command *types.Command) error
 }
 
-func NewProcessor(eventBus EventBusPublisher, handlers map[types.CommandName]CommandHandler) *Processor {
+type Processor struct {
+	eventBus       EventBusPublisher
+	handlers       map[types.CommandName]CommandHandler
+	transactionMgr TransactionController
+}
+
+func NewProcessor(eventBus EventBusPublisher, handlers map[types.CommandName]CommandHandler, transactionMgr TransactionController) *Processor {
 	return &Processor{
-		eventBus: eventBus,
-		handlers: handlers,
+		eventBus:       eventBus,
+		handlers:       handlers,
+		transactionMgr: transactionMgr,
 	}
 }
 
@@ -49,6 +56,11 @@ func (p *Processor) executeCommand(ctx context.Context, command *types.Command) 
 	handler, ok := p.handlers[command.Command]
 	if !ok {
 		return nil, fmt.Errorf("command not registered: %s", string(command.Command))
+	}
+
+	if p.transactionMgr.HasTransaction(ctx) && command.Command != types.Exec {
+		// p.transactionMgr.AddToTransaction(ctx, command)
+		// return "QUEUED"
 	}
 
 	result, err := handler.HandleCommand(ctx, command)

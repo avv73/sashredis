@@ -67,7 +67,7 @@ func main() {
 	parser := marshal.NewParser()
 	encoder := marshal.NewEncoder()
 
-	processor := processor.NewProcessor(bus, handlers)
+	processor := processor.NewProcessor(bus, handlers, transactionMgr)
 
 	router := network.NewRequestRouter(bus, parser, encoder)
 	listener := network.NewTCPListener(config.GetConfig().Port, router)

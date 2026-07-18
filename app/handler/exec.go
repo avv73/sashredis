@@ -9,6 +9,7 @@ import (
 
 type TransactionExecHandler interface {
 	HasTransaction(ctx context.Context) bool
+	ExecuteTransaction(ctx context.Context) (*types.RedisData, error)
 }
 
 type ExecHandler struct {
@@ -31,5 +32,5 @@ func (e *ExecHandler) HandleCommand(ctx context.Context, command *types.Command)
 		return nil, types.ErrExecWithoutMulti
 	}
 
-	return types.OkResponse, nil
+	return e.transactionHandler.ExecuteTransaction(ctx)
 }
