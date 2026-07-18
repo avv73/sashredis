@@ -23,6 +23,7 @@ const (
 	Xrange CommandName = "XRANGE"
 	Xread  CommandName = "XREAD"
 	Incr   CommandName = "INCR"
+	Multi  CommandName = "MULTI"
 )
 
 type DataType int
