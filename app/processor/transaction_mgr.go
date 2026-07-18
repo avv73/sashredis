@@ -36,6 +36,14 @@ func (t *TransactionManager) BeginTransaction(ctx context.Context) error {
 	return nil
 }
 
+func (t *TransactionManager) AbortTransaction(ctx context.Context) error {
+	if !t.HasTransaction(ctx) {
+		return errors.New("no transaction in progress")
+	}
+	delete(t.transactions, exctx.FromContext(ctx).ConnectionId)
+	return nil
+}
+
 func (t *TransactionManager) ExecuteTransaction(ctx context.Context) (*types.RedisData, error) {
 	if !t.HasTransaction(ctx) {
 		return nil, errors.New("no transaction in progress")

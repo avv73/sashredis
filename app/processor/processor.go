@@ -58,7 +58,7 @@ func (p *Processor) ExecuteCommand(ctx context.Context, command *types.Command) 
 		return nil, fmt.Errorf("command not registered: %s", string(command.Command))
 	}
 
-	if p.transactionMgr.HasTransaction(ctx) && command.Command != types.Exec {
+	if p.transactionMgr.HasTransaction(ctx) && !isTransactionControlCommand(command) {
 		p.transactionMgr.AddToTransaction(ctx, command)
 		return types.QueuedResponse, nil
 	}
@@ -70,4 +70,8 @@ func (p *Processor) ExecuteCommand(ctx context.Context, command *types.Command) 
 
 	log.Infof("exec result: %s", result)
 	return result, nil
+}
+
+func isTransactionControlCommand(command *types.Command) bool {
+	return command.Command == types.Exec || command.Command == types.Discard
 }

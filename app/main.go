@@ -43,25 +43,27 @@ func main() {
 	incrHandler := handler.NewIncrHandler(storage)
 	multiHandler := handler.NewMultiHandler(transactionMgr)
 	execHandler := handler.NewExecHandler(transactionMgr)
+	discardHandler := handler.NewDiscardHandler(transactionMgr)
 
 	handlers := map[types.CommandName]processor.CommandHandler{
-		types.Ping:   pingHandler,
-		types.Echo:   echoHandler,
-		types.Get:    getHandler,
-		types.Set:    setHandler,
-		types.Rpush:  rpushHandler,
-		types.Lrange: lrangeHandler,
-		types.Lpush:  lpushHandler,
-		types.Llen:   llenHandler,
-		types.Lpop:   lpopHandler,
-		types.Blpop:  blpopHandler,
-		types.Type:   typeHandler,
-		types.Xadd:   xaddHandler,
-		types.Xrange: xrangeHandler,
-		types.Xread:  xreadHandler,
-		types.Incr:   incrHandler,
-		types.Multi:  multiHandler,
-		types.Exec:   execHandler,
+		types.Ping:    pingHandler,
+		types.Echo:    echoHandler,
+		types.Get:     getHandler,
+		types.Set:     setHandler,
+		types.Rpush:   rpushHandler,
+		types.Lrange:  lrangeHandler,
+		types.Lpush:   lpushHandler,
+		types.Llen:    llenHandler,
+		types.Lpop:    lpopHandler,
+		types.Blpop:   blpopHandler,
+		types.Type:    typeHandler,
+		types.Xadd:    xaddHandler,
+		types.Xrange:  xrangeHandler,
+		types.Xread:   xreadHandler,
+		types.Incr:    incrHandler,
+		types.Multi:   multiHandler,
+		types.Exec:    execHandler,
+		types.Discard: discardHandler,
 	}
 
 	parser := marshal.NewParser()
