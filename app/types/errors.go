@@ -50,6 +50,7 @@ func (r *RedisError) AsRedisData() *RedisData {
 
 var ErrWrongType *RedisError = NewRedisError(WrongType, "Operation against a key holding the wrong kind of value")
 var ErrValueNotInteger *RedisError = NewRedisError(GeneralError, "value is not an integer or out of range")
+var ErrExecWithoutMulti *RedisError = NewRedisError(GeneralError, "EXEC without MULTI")
 
 type BlockError struct {
 }

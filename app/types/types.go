@@ -24,6 +24,7 @@ const (
 	Xread  CommandName = "XREAD"
 	Incr   CommandName = "INCR"
 	Multi  CommandName = "MULTI"
+	Exec   CommandName = "EXEC"
 )
 
 type DataType int
