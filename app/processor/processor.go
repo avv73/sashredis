@@ -46,13 +46,13 @@ func (p *Processor) Start(ctx context.Context) {
 				return
 			}
 
-			result, err := p.executeCommand(execCtx, command)
+			result, err := p.ExecuteCommand(execCtx, command)
 			callback(result, err)
 		}
 	}()
 }
 
-func (p *Processor) executeCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (p *Processor) ExecuteCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
 	handler, ok := p.handlers[command.Command]
 	if !ok {
 		return nil, fmt.Errorf("command not registered: %s", string(command.Command))

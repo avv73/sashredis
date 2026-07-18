@@ -190,7 +190,7 @@ func (s *Storage) PrependToList(key string, data *types.RedisData) (int, error) 
 	}
 
 	s.store[key].List.PushFront(data)
-	s.notifyFirst(key, data)
+	defer s.notifyFirst(key, data)
 
 	return s.store[key].List.Len(), nil
 }

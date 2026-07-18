@@ -68,6 +68,7 @@ func main() {
 	encoder := marshal.NewEncoder()
 
 	processor := processor.NewProcessor(bus, handlers, transactionMgr)
+	transactionMgr.RegisterExecutor(processor)
 
 	router := network.NewRequestRouter(bus, parser, encoder)
 	listener := network.NewTCPListener(config.GetConfig().Port, router)

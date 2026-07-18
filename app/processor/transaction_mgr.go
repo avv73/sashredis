@@ -10,6 +10,11 @@ import (
 
 type TransactionManager struct {
 	transactions map[string][]*types.Command
+	executor     CommandExecutor
+}
+
+type CommandExecutor interface {
+	ExecuteCommand(ctx context.Context, command *types.Command) (*types.RedisData, error)
 }
 
 func NewTransactionManager() *TransactionManager {
@@ -45,7 +50,23 @@ func (t *TransactionManager) ExecuteTransaction(ctx context.Context) (*types.Red
 		}, nil
 	}
 
-	return nil, nil // TODO
+	results := make([]*types.RedisData, 0, len(transactions))
+	for _, command := range transactions {
+		result, err := t.executor.ExecuteCommand(ctx, command)
+		if err != nil {
+			// Flatten the errors
+			result = &types.RedisData{
+				Type: types.Error,
+				Data: err.Error(),
+			}
+		}
+		results = append(results, result)
+	}
+
+	return &types.RedisData{
+		Type:  types.Array,
+		Holds: results,
+	}, nil
 }
 
 func (t *TransactionManager) AddToTransaction(ctx context.Context, command *types.Command) error {
@@ -54,4 +75,8 @@ func (t *TransactionManager) AddToTransaction(ctx context.Context, command *type
 	}
 	t.transactions[exctx.FromContext(ctx).ConnectionId] = append(t.transactions[exctx.FromContext(ctx).ConnectionId], command)
 	return nil
+}
+
+func (t *TransactionManager) RegisterExecutor(executor CommandExecutor) {
+	t.executor = executor
 }
