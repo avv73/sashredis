@@ -59,8 +59,8 @@ func (p *Processor) executeCommand(ctx context.Context, command *types.Command) 
 	}
 
 	if p.transactionMgr.HasTransaction(ctx) && command.Command != types.Exec {
-		// p.transactionMgr.AddToTransaction(ctx, command)
-		// return "QUEUED"
+		p.transactionMgr.AddToTransaction(ctx, command)
+		return types.QueuedResponse, nil
 	}
 
 	result, err := handler.HandleCommand(ctx, command)

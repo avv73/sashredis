@@ -5,6 +5,11 @@ var OkResponse *RedisData = &RedisData{
 	Data: "OK",
 }
 
+var QueuedResponse *RedisData = &RedisData{
+	Type: SString,
+	Data: "QUEUED",
+}
+
 // Serializes to $-1\r\n (null bulk string)
 var NullResponse *RedisData = &RedisData{
 	Type: Null,
