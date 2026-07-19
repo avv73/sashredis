@@ -78,12 +78,17 @@ func main() {
 
 	router := network.NewRequestRouter(bus, parser, encoder)
 	listener := network.NewTCPListener(config.GetConfig().Port, router)
+	masterClient := replica.NewClient()
 
-	replicationMgr := replica.NewManager(serverInfoStore)
+	replicationMgr := replica.NewManager(serverInfoStore, masterClient)
 
-	replicationMgr.Initialize()
+	err := replicationMgr.Initialize(ctx)
+	if err != nil {
+		log.Fatalf("failed to trigger replication: %s", err.Error())
+	}
+
 	processor.Start(ctx)
-	err := listener.StartListen(ctx)
+	err = listener.StartListen(ctx)
 	if err != nil {
 		log.WithError(err).Errorln("Failed to start listening")
 	}
