@@ -1,6 +1,7 @@
 package config
 
 import (
+	"flag"
 	"sync"
 
 	"github.com/kelseyhightower/envconfig"
@@ -18,12 +19,22 @@ var config Config
 
 func GetConfig() Config {
 	once.Do(func() {
+		// get env variables first
 		var c Config
 		err := envconfig.Process("sashredis", &c)
 		if err != nil {
 			log.WithError(err).Fatal("error reading process variables")
 		}
 		config = c
+
+		// override any env variables with CLI
+
+		portCli := flag.Int("port", 6379, "Port to listen to.")
+		flag.Parse()
+
+		if portCli != nil {
+			config.Port = *portCli
+		}
 	})
 	return config
 }
