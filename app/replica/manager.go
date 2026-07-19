@@ -1,7 +1,9 @@
 package replica
 
+import "github.com/codecrafters-io/redis-starter-go/app/config"
+
 type ServerInfoHandler interface {
-	SetDefaultReplicationInfo()
+	SetReplicationInfo(isMaster bool)
 }
 
 type Manager struct {
@@ -16,5 +18,11 @@ func NewManager(storage ServerInfoHandler) *Manager {
 
 func (m *Manager) Initialize() {
 	// TODO: Determine whether we have replication here and do some special stuff.
-	m.infoStore.SetDefaultReplicationInfo()
+	hasReplicaOf := false
+	conf := config.GetConfig()
+	if conf.ReplicaOf != "" {
+		hasReplicaOf = true
+	}
+
+	m.infoStore.SetReplicationInfo(!hasReplicaOf)
 }

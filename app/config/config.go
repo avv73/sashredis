@@ -12,6 +12,7 @@ type Config struct {
 	MaxConnections        int `default:"1024"`
 	CommandBufferCapacity int `default:"1024"`
 	Port                  int `default:"6379"`
+	ReplicaOf             string
 }
 
 var once sync.Once
@@ -28,12 +29,16 @@ func GetConfig() Config {
 		config = c
 
 		// override any env variables with CLI
-
 		portCli := flag.Int("port", 6379, "Port to listen to.")
+		replicaOfCli := flag.String("replicaof", "", "Replication information for the master; Sashredis assumes replica role.")
 		flag.Parse()
 
 		if portCli != nil {
 			config.Port = *portCli
+		}
+
+		if replicaOfCli != nil {
+			config.ReplicaOf = *replicaOfCli
 		}
 	})
 	return config

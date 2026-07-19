@@ -10,8 +10,13 @@ func NewServerInfoStore() *ServerInfo {
 	}
 }
 
-func (s *ServerInfo) SetDefaultReplicationInfo() {
-	s.data["role"] = "master"
+func (s *ServerInfo) SetReplicationInfo(isMaster bool) {
+	role := "slave"
+	if isMaster {
+		role = "master"
+	}
+
+	s.data["role"] = role
 }
 
 var replicationInfoKeys map[string]any = map[string]any{
