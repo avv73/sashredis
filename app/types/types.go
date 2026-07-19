@@ -26,6 +26,7 @@ const (
 	Multi   CommandName = "MULTI"
 	Exec    CommandName = "EXEC"
 	Discard CommandName = "DISCARD"
+	Info    CommandName = "INFO"
 )
 
 type DataType int

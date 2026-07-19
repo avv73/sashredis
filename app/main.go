@@ -12,6 +12,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/marshal"
 	"github.com/codecrafters-io/redis-starter-go/app/network"
 	"github.com/codecrafters-io/redis-starter-go/app/processor"
+	"github.com/codecrafters-io/redis-starter-go/app/replica"
 	"github.com/codecrafters-io/redis-starter-go/app/storage"
 	"github.com/codecrafters-io/redis-starter-go/app/types"
 )
@@ -22,28 +23,30 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 
-	storage := storage.NewStorage()
+	dataStorage := storage.NewStorage()
+	serverInfoStore := storage.NewServerInfoStore()
 	bus := processor.NewEventBus()
 	transactionMgr := processor.NewTransactionManager()
 
 	pingHandler := handler.NewPingHandler()
 	echoHandler := handler.NewEchoHandler()
-	getHandler := handler.NewGetHandler(storage)
-	setHandler := handler.NewSetHandler(storage)
-	rpushHandler := handler.NewRpushHandler(storage)
-	lrangeHandler := handler.NewLrangeHandler(storage)
-	lpushHandler := handler.NewLpushHandler(storage)
-	llenHandler := handler.NewLlenHandler(storage)
-	lpopHandler := handler.NewLpopHandler(storage)
-	blpopHandler := handler.NewBlpopHandler(storage, bus)
-	typeHandler := handler.NewTypeHandler(storage)
-	xaddHandler := handler.NewXaddHandler(storage)
-	xrangeHandler := handler.NewXrangeHandler(storage)
-	xreadHandler := handler.NewXreadHandler(storage, bus)
-	incrHandler := handler.NewIncrHandler(storage)
+	getHandler := handler.NewGetHandler(dataStorage)
+	setHandler := handler.NewSetHandler(dataStorage)
+	rpushHandler := handler.NewRpushHandler(dataStorage)
+	lrangeHandler := handler.NewLrangeHandler(dataStorage)
+	lpushHandler := handler.NewLpushHandler(dataStorage)
+	llenHandler := handler.NewLlenHandler(dataStorage)
+	lpopHandler := handler.NewLpopHandler(dataStorage)
+	blpopHandler := handler.NewBlpopHandler(dataStorage, bus)
+	typeHandler := handler.NewTypeHandler(dataStorage)
+	xaddHandler := handler.NewXaddHandler(dataStorage)
+	xrangeHandler := handler.NewXrangeHandler(dataStorage)
+	xreadHandler := handler.NewXreadHandler(dataStorage, bus)
+	incrHandler := handler.NewIncrHandler(dataStorage)
 	multiHandler := handler.NewMultiHandler(transactionMgr)
 	execHandler := handler.NewExecHandler(transactionMgr)
 	discardHandler := handler.NewDiscardHandler(transactionMgr)
+	infoHandler := handler.NewInfoStorage(serverInfoStore)
 
 	handlers := map[types.CommandName]processor.CommandHandler{
 		types.Ping:    pingHandler,
@@ -64,6 +67,7 @@ func main() {
 		types.Multi:   multiHandler,
 		types.Exec:    execHandler,
 		types.Discard: discardHandler,
+		types.Info:    infoHandler,
 	}
 
 	parser := marshal.NewParser()
@@ -75,6 +79,9 @@ func main() {
 	router := network.NewRequestRouter(bus, parser, encoder)
 	listener := network.NewTCPListener(config.GetConfig().Port, router)
 
+	replicationMgr := replica.NewManager(serverInfoStore)
+
+	replicationMgr.Initialize()
 	processor.Start(ctx)
 	err := listener.StartListen(ctx)
 	if err != nil {
