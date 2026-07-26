@@ -17,6 +17,8 @@ type ServerInfoHandler interface {
 type MasterClient interface {
 	Ping(ctx context.Context) error
 	Connect(ctx context.Context, host string, port int) error
+	ReplConfListeningPort(ctx context.Context, port int) error
+	ReplConfCapa(ctx context.Context) error
 }
 
 type Manager struct {
@@ -65,6 +67,16 @@ func (m *Manager) performHandshake(ctx context.Context, replicaOf string) error 
 	err = m.masterClient.Ping(ctx)
 	if err != nil {
 		return fmt.Errorf("handshake failed ping: %w", err)
+	}
+
+	err = m.masterClient.ReplConfListeningPort(ctx, config.GetConfig().Port)
+	if err != nil {
+		return fmt.Errorf("handshake failed replconf listening port: %w", err)
+	}
+
+	err = m.masterClient.ReplConfCapa(ctx)
+	if err != nil {
+		return fmt.Errorf("handshake failed replconf capa psync2: %w", err)
 	}
 
 	return nil

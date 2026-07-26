@@ -47,27 +47,29 @@ func main() {
 	execHandler := handler.NewExecHandler(transactionMgr)
 	discardHandler := handler.NewDiscardHandler(transactionMgr)
 	infoHandler := handler.NewInfoStorage(serverInfoStore)
+	replConfHandler := handler.NewReplConfHandler()
 
 	handlers := map[types.CommandName]processor.CommandHandler{
-		types.Ping:    pingHandler,
-		types.Echo:    echoHandler,
-		types.Get:     getHandler,
-		types.Set:     setHandler,
-		types.Rpush:   rpushHandler,
-		types.Lrange:  lrangeHandler,
-		types.Lpush:   lpushHandler,
-		types.Llen:    llenHandler,
-		types.Lpop:    lpopHandler,
-		types.Blpop:   blpopHandler,
-		types.Type:    typeHandler,
-		types.Xadd:    xaddHandler,
-		types.Xrange:  xrangeHandler,
-		types.Xread:   xreadHandler,
-		types.Incr:    incrHandler,
-		types.Multi:   multiHandler,
-		types.Exec:    execHandler,
-		types.Discard: discardHandler,
-		types.Info:    infoHandler,
+		types.Ping:     pingHandler,
+		types.Echo:     echoHandler,
+		types.Get:      getHandler,
+		types.Set:      setHandler,
+		types.Rpush:    rpushHandler,
+		types.Lrange:   lrangeHandler,
+		types.Lpush:    lpushHandler,
+		types.Llen:     llenHandler,
+		types.Lpop:     lpopHandler,
+		types.Blpop:    blpopHandler,
+		types.Type:     typeHandler,
+		types.Xadd:     xaddHandler,
+		types.Xrange:   xrangeHandler,
+		types.Xread:    xreadHandler,
+		types.Incr:     incrHandler,
+		types.Multi:    multiHandler,
+		types.Exec:     execHandler,
+		types.Discard:  discardHandler,
+		types.Info:     infoHandler,
+		types.ReplConf: replConfHandler,
 	}
 
 	parser := marshal.NewParser()
@@ -78,7 +80,7 @@ func main() {
 
 	router := network.NewRequestRouter(bus, parser, encoder)
 	listener := network.NewTCPListener(config.GetConfig().Port, router)
-	masterClient := replica.NewClient()
+	masterClient := replica.NewClient(encoder)
 
 	replicationMgr := replica.NewManager(serverInfoStore, masterClient)
 

@@ -8,25 +8,26 @@ import (
 type CommandName string
 
 const (
-	Ping    CommandName = "PING"
-	Echo    CommandName = "ECHO"
-	Set     CommandName = "SET"
-	Get     CommandName = "GET"
-	Rpush   CommandName = "RPUSH"
-	Lrange  CommandName = "LRANGE"
-	Lpush   CommandName = "LPUSH"
-	Llen    CommandName = "LLEN"
-	Lpop    CommandName = "LPOP"
-	Blpop   CommandName = "BLPOP"
-	Type    CommandName = "TYPE"
-	Xadd    CommandName = "XADD"
-	Xrange  CommandName = "XRANGE"
-	Xread   CommandName = "XREAD"
-	Incr    CommandName = "INCR"
-	Multi   CommandName = "MULTI"
-	Exec    CommandName = "EXEC"
-	Discard CommandName = "DISCARD"
-	Info    CommandName = "INFO"
+	Ping     CommandName = "PING"
+	Echo     CommandName = "ECHO"
+	Set      CommandName = "SET"
+	Get      CommandName = "GET"
+	Rpush    CommandName = "RPUSH"
+	Lrange   CommandName = "LRANGE"
+	Lpush    CommandName = "LPUSH"
+	Llen     CommandName = "LLEN"
+	Lpop     CommandName = "LPOP"
+	Blpop    CommandName = "BLPOP"
+	Type     CommandName = "TYPE"
+	Xadd     CommandName = "XADD"
+	Xrange   CommandName = "XRANGE"
+	Xread    CommandName = "XREAD"
+	Incr     CommandName = "INCR"
+	Multi    CommandName = "MULTI"
+	Exec     CommandName = "EXEC"
+	Discard  CommandName = "DISCARD"
+	Info     CommandName = "INFO"
+	ReplConf CommandName = "REPLCONF"
 )
 
 type DataType int
@@ -69,6 +70,19 @@ type RedisData struct {
 	Type  DataType
 	Data  string
 	Holds []*RedisData
+}
+
+// ToCommandRedisData converts an array of strings to a Redis array, comprised of BStrings, as a redis command.
+func ToCommandRedisData(command ...string) *RedisData {
+	result := &RedisData{
+		Type:  Array,
+		Holds: make([]*RedisData, 0, len(command)),
+	}
+
+	for _, cmd := range command {
+		result.Holds = append(result.Holds, &RedisData{Type: BString, Data: cmd})
+	}
+	return result
 }
 
 func (r *RedisData) IsNil() bool {
