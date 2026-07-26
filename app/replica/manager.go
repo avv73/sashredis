@@ -19,6 +19,7 @@ type MasterClient interface {
 	Connect(ctx context.Context, host string, port int) error
 	ReplConfListeningPort(ctx context.Context, port int) error
 	ReplConfCapa(ctx context.Context) error
+	Psync(ctx context.Context, replicationId string, offset string) error
 }
 
 type Manager struct {
@@ -77,6 +78,11 @@ func (m *Manager) performHandshake(ctx context.Context, replicaOf string) error 
 	err = m.masterClient.ReplConfCapa(ctx)
 	if err != nil {
 		return fmt.Errorf("handshake failed replconf capa psync2: %w", err)
+	}
+
+	err = m.masterClient.Psync(ctx, "?", "-1")
+	if err != nil {
+		return fmt.Errorf("handshake failed psync: %w", err)
 	}
 
 	return nil

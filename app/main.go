@@ -48,6 +48,7 @@ func main() {
 	discardHandler := handler.NewDiscardHandler(transactionMgr)
 	infoHandler := handler.NewInfoStorage(serverInfoStore)
 	replConfHandler := handler.NewReplConfHandler()
+	psyncHandler := handler.NewPSyncHandler()
 
 	handlers := map[types.CommandName]processor.CommandHandler{
 		types.Ping:     pingHandler,
@@ -70,6 +71,7 @@ func main() {
 		types.Discard:  discardHandler,
 		types.Info:     infoHandler,
 		types.ReplConf: replConfHandler,
+		types.Psync:    psyncHandler,
 	}
 
 	parser := marshal.NewParser()

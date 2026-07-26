@@ -28,6 +28,7 @@ const (
 	Discard  CommandName = "DISCARD"
 	Info     CommandName = "INFO"
 	ReplConf CommandName = "REPLCONF"
+	Psync    CommandName = "PSYNC"
 )
 
 type DataType int

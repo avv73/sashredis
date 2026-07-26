@@ -96,6 +96,26 @@ func (c *Client) ReplConfCapa(ctx context.Context) error {
 	return c.verifyMasterResponse(ctx, replConfResult)
 }
 
+func (c *Client) Psync(ctx context.Context, replicationId string, offset string) error {
+	if c.conn == nil {
+		return errors.New("no connection in progress; connect first")
+	}
+
+	psyncCommand := types.ToCommandRedisData("PSYNC", replicationId, offset)
+	commandBytes, err := c.encoder.Encode(psyncCommand)
+	if err != nil {
+		return fmt.Errorf("internal encoding error: %w", err)
+	}
+
+	err = c.writeToMaster(ctx, commandBytes)
+	if err != nil {
+		return fmt.Errorf("writing to master failed: %w", err)
+	}
+
+	expectedResponse := fmt.Appendf(make([]byte, 0), "+FULLRESYNC %s 0\r\n", replicationId)
+	return c.verifyMasterResponse(ctx, expectedResponse)
+}
+
 func (c *Client) verifyMasterResponse(ctx context.Context, expectedResponse []byte) error {
 	output := make([]byte, len(expectedResponse))
 	err := c.readFromMaster(ctx, output)
@@ -104,7 +124,7 @@ func (c *Client) verifyMasterResponse(ctx context.Context, expectedResponse []by
 	}
 
 	if !bytes.Equal(output, expectedResponse) {
-		return fmt.Errorf("expected a PONG response from master, got: %s", string(output))
+		return fmt.Errorf("expected a %s response from master, got: %s", string(expectedResponse), string(output))
 	}
 
 	return nil
