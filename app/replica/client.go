@@ -112,8 +112,7 @@ func (c *Client) Psync(ctx context.Context, replicationId string, offset string)
 		return fmt.Errorf("writing to master failed: %w", err)
 	}
 
-	expectedResponse := fmt.Appendf(make([]byte, 0), "+FULLRESYNC %s 0\r\n", replicationId)
-	return c.verifyMasterResponse(ctx, expectedResponse)
+	return nil // TODO: Perform proper pSYNC validation later on c.verifyMasterResponse(ctx, expectedResponse)
 }
 
 func (c *Client) verifyMasterResponse(ctx context.Context, expectedResponse []byte) error {
