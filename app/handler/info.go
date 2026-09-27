@@ -7,11 +7,12 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/codecrafters-io/redis-starter-go/app/storage"
 	"github.com/codecrafters-io/redis-starter-go/app/types"
 )
 
 type InfoStorage interface {
-	GetReplicationInfo() map[string]string
+	GetReplicationInfo() storage.ReplicationInfo
 }
 
 type InfoHandler struct {
