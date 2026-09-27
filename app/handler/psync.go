@@ -42,11 +42,16 @@ func (p *PSyncHandler) HandleCommand(ctx context.Context, command *types.Command
 		return nil, err
 	}
 
+	length := len(decoded)
+	strDataHeader := fmt.Sprintf("$%d\r\n", length)
+	headerBinary := []byte(strDataHeader)
+
+	extraResponse := append(headerBinary, decoded...)
 	return &types.CommandResponse{
 		Data: &types.RedisData{
 			Type: types.SString,
 			Data: fmt.Sprintf("FULLRESYNC %s 0", masterReplicationId),
 		},
-		ExtraData: decoded,
+		ExtraData: extraResponse,
 	}, nil
 }
