@@ -14,13 +14,13 @@ func NewPingHandler() *PingHandler {
 	return &PingHandler{}
 }
 
-func (*PingHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (*PingHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error) {
 	if len(command.Args) > 0 {
 		return nil, errors.New("unexpected number of arguments")
 	}
 
-	return &types.RedisData{
+	return (&types.RedisData{
 		Type: types.SString,
 		Data: "PONG",
-	}, nil
+	}).BuildResponse(), nil
 }

@@ -22,7 +22,7 @@ func NewLpopHandler(storage PopStorage) *LpopHandler {
 	}
 }
 
-func (l *LpopHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (l *LpopHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error) {
 	if len(command.Args) > 2 || len(command.Args) == 0 {
 		return nil, errors.New("unexpected number of arguments")
 	}
@@ -46,5 +46,5 @@ func (l *LpopHandler) HandleCommand(ctx context.Context, command *types.Command)
 		return types.NullResponse, nil
 	}
 
-	return result, nil
+	return result.BuildResponse(), nil
 }

@@ -22,7 +22,7 @@ func NewRpushHandler(storage ListStorage) *RpushHandler {
 	}
 }
 
-func (r *RpushHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (r *RpushHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error) {
 	if len(command.Args) < 2 {
 		return nil, errors.New("unexpected number of arguments")
 	}
@@ -38,8 +38,8 @@ func (r *RpushHandler) HandleCommand(ctx context.Context, command *types.Command
 		}
 	}
 
-	return &types.RedisData{
+	return (&types.RedisData{
 		Type: types.Integer,
 		Data: strconv.Itoa(result),
-	}, nil
+	}).BuildResponse(), nil
 }

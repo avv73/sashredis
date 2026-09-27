@@ -22,7 +22,7 @@ func NewLlenHandler(storage LengthStorage) *LlenHandler {
 	}
 }
 
-func (l *LlenHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (l *LlenHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error) {
 	if len(command.Args) != 1 {
 		return nil, errors.New("unexpected number of arguments")
 	}
@@ -34,8 +34,8 @@ func (l *LlenHandler) HandleCommand(ctx context.Context, command *types.Command)
 		return nil, err
 	}
 
-	return &types.RedisData{
+	return (&types.RedisData{
 		Type: types.Integer,
 		Data: strconv.Itoa(result),
-	}, nil
+	}).BuildResponse(), nil
 }

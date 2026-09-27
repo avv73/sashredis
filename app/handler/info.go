@@ -25,7 +25,7 @@ func NewInfoStorage(storage InfoStorage) *InfoHandler {
 	}
 }
 
-func (s *InfoHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (s *InfoHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error) {
 	if len(command.Args) != 1 && command.Args[0].Data != "replication" {
 		return nil, errors.New("expected INFO replication")
 	}
@@ -44,8 +44,8 @@ func (s *InfoHandler) HandleCommand(ctx context.Context, command *types.Command)
 	}
 
 	resultStr := strings.Join(pairs, "\r\n")
-	return &types.RedisData{
+	return (&types.RedisData{
 		Type: types.BString,
 		Data: fmt.Sprintf("%s\r\n", resultStr),
-	}, nil
+	}).BuildResponse(), nil
 }

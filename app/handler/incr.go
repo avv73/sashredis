@@ -21,7 +21,7 @@ func NewIncrHandler(storage IncrStorage) *IncrHandler {
 	}
 }
 
-func (s *IncrHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (s *IncrHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error) {
 	if len(command.Args) != 1 {
 		return nil, errors.New("expected a single argument")
 	}
@@ -33,5 +33,5 @@ func (s *IncrHandler) HandleCommand(ctx context.Context, command *types.Command)
 		return nil, err
 	}
 
-	return result, nil
+	return result.BuildResponse(), nil
 }

@@ -37,5 +37,5 @@ func (s *GetHandler) HandleCommand(ctx context.Context, command *types.Command) 
 		return types.NullResponse, nil
 	}
 
-	return &types.CommandResponse{Data: result}, nil
+	return result.BuildResponse(), nil
 }

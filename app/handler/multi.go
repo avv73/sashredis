@@ -21,7 +21,7 @@ func NewMultiHandler(transactionHandler TransactionHandler) *MultiHandler {
 	}
 }
 
-func (l *MultiHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (l *MultiHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error) {
 	if len(command.Args) > 0 {
 		return nil, errors.New("unexpected number of arguments")
 	}

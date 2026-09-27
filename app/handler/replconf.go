@@ -17,7 +17,7 @@ func NewReplConfHandler() *ReplConfHandler {
 	return &ReplConfHandler{}
 }
 
-func (*ReplConfHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (*ReplConfHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error) {
 	if len(command.Args) == 0 {
 		return nil, errors.New("unexpected number of arguments")
 	}
