@@ -29,7 +29,7 @@ func NewXreadHandler(storage XreadStorage, connUnblocker ConnUnblocker) *XreadHa
 	}
 }
 
-func (x *XreadHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (x *XreadHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error) {
 	if len(command.Args) < 3 {
 		return nil, errors.New("unexpected number of arguments")
 	}
@@ -89,10 +89,10 @@ func (x *XreadHandler) HandleCommand(ctx context.Context, command *types.Command
 			return nil, err
 		}
 
-		return &types.RedisData{
+		return (&types.RedisData{
 			Type:  types.Array,
 			Holds: result,
-		}, nil
+		}).BuildResponse(), nil
 	}
 
 	// blocking path
@@ -101,10 +101,10 @@ func (x *XreadHandler) HandleCommand(ctx context.Context, command *types.Command
 	}
 
 	if !x.isEmptyReadResponse(result) {
-		return &types.RedisData{
+		return (&types.RedisData{
 			Type:  types.Array,
 			Holds: result,
-		}, nil
+		}).BuildResponse(), nil
 	}
 
 	err = x.storage.ScheduleReadStream(ctx, streamKeys, entryIds, blockTimeoutMs, func(rd []*types.RedisData, b bool) {

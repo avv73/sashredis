@@ -21,7 +21,7 @@ func NewXrangeHandler(storage XrangeStorage) *XrangeHandler {
 	}
 }
 
-func (x *XrangeHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (x *XrangeHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error) {
 	if len(command.Args) != 3 {
 		return nil, errors.New("unexpected number of arguments")
 	}
@@ -35,8 +35,8 @@ func (x *XrangeHandler) HandleCommand(ctx context.Context, command *types.Comman
 		return nil, err
 	}
 
-	return &types.RedisData{
+	return (&types.RedisData{
 		Type:  types.Array,
 		Holds: results,
-	}, nil
+	}).BuildResponse(), nil
 }

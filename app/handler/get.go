@@ -21,7 +21,7 @@ func NewGetHandler(storage GetterStorage) *GetHandler {
 	}
 }
 
-func (s *GetHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (s *GetHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error) {
 	if len(command.Args) != 1 {
 		return nil, errors.New("unexpected number of arguments")
 	}
@@ -37,5 +37,5 @@ func (s *GetHandler) HandleCommand(ctx context.Context, command *types.Command) 
 		return types.NullResponse, nil
 	}
 
-	return result, nil
+	return &types.CommandResponse{Data: result}, nil
 }

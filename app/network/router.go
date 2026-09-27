@@ -24,7 +24,7 @@ type ResultEncoder interface {
 
 type EventBus interface {
 	// Execute sends a command to the processor and blocks the caller until a response is received.
-	Execute(ctx context.Context, command *types.Command) (*types.RedisData, error)
+	Execute(ctx context.Context, command *types.Command) (*types.CommandResponse, error)
 }
 
 type RequestRouter struct {
@@ -82,7 +82,7 @@ func (r *RequestRouter) HandleConnection(ctx context.Context, connection net.Con
 			continue
 		}
 
-		encodedResult, err := r.encoder.Encode(result)
+		encodedResult, err := r.encoder.Encode(result.Data)
 		if err != nil {
 			log.WithError(err).Error("failed encoding result")
 			r.writeResult(connection, types.NewRedisError(types.GeneralError, "Unexpected error occurred").AsRedisData())
@@ -93,6 +93,13 @@ func (r *RequestRouter) HandleConnection(ctx context.Context, connection net.Con
 		if err != nil {
 			log.WithError(err).Error("failed writing result")
 			return fmt.Errorf("connection write: %w", err)
+		}
+
+		if len(result.ExtraData) > 0 {
+			if _, err := connection.Write(result.ExtraData); err != nil {
+				log.WithError(err).Error("failed writing extra result")
+				return fmt.Errorf("connection extra write: %w", err)
+			}
 		}
 	}
 }

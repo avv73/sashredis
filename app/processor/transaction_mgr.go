@@ -14,7 +14,7 @@ type TransactionManager struct {
 }
 
 type CommandExecutor interface {
-	ExecuteCommand(ctx context.Context, command *types.Command) (*types.RedisData, error)
+	ExecuteCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error)
 }
 
 func NewTransactionManager() *TransactionManager {
@@ -63,12 +63,14 @@ func (t *TransactionManager) ExecuteTransaction(ctx context.Context) (*types.Red
 		result, err := t.executor.ExecuteCommand(ctx, command)
 		if err != nil {
 			// Flatten the errors
-			result = &types.RedisData{
+			resultToWrite := &types.RedisData{
 				Type: types.Error,
 				Data: err.Error(),
 			}
+			results = append(results, resultToWrite)
+			continue
 		}
-		results = append(results, result)
+		results = append(results, result.Data)
 	}
 
 	return &types.RedisData{

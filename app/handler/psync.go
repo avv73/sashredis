@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 
@@ -19,7 +20,9 @@ func NewPSyncHandler(storage InfoStorage) *PSyncHandler {
 	}
 }
 
-func (p *PSyncHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+const emptyRdbFile = "UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog=="
+
+func (p *PSyncHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error) {
 	if len(command.Args) != 2 {
 		return nil, errors.New("unexpected number of arguments")
 	}
@@ -34,8 +37,16 @@ func (p *PSyncHandler) HandleCommand(ctx context.Context, command *types.Command
 		return nil, errors.New("master has no replication id set")
 	}
 
-	return &types.RedisData{
-		Type: types.SString,
-		Data: fmt.Sprintf("FULLRESYNC %s 0", masterReplicationId),
+	decoded, err := base64.StdEncoding.DecodeString(emptyRdbFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.CommandResponse{
+		Data: &types.RedisData{
+			Type: types.SString,
+			Data: fmt.Sprintf("FULLRESYNC %s 0", masterReplicationId),
+		},
+		ExtraData: decoded,
 	}, nil
 }

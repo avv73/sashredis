@@ -22,7 +22,7 @@ func NewXaddHandler(storage AddStreamStorage) *XaddHandler {
 	}
 }
 
-func (x *XaddHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (x *XaddHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error) {
 	if len(command.Args) < 1 {
 		return nil, errors.New("unexpected number of arguments")
 	}
@@ -45,10 +45,10 @@ func (x *XaddHandler) HandleCommand(ctx context.Context, command *types.Command)
 		return nil, err
 	}
 
-	return &types.RedisData{
+	return (&types.RedisData{
 		Type: types.BString,
 		Data: xaddResult,
-	}, nil
+	}).BuildResponse(), nil
 }
 
 func (x *XaddHandler) hasExplicitEntryId(commandArgs []*types.RedisData) bool {

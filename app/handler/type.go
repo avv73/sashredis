@@ -22,7 +22,7 @@ func NewTypeHandler(storage TyperStorage) *TypeHandler {
 	}
 }
 
-func (t *TypeHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (t *TypeHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error) {
 	if len(command.Args) != 1 {
 		return nil, errors.New("unexpected number of arguments")
 	}
@@ -30,8 +30,8 @@ func (t *TypeHandler) HandleCommand(ctx context.Context, command *types.Command)
 	key := command.Args[0]
 	typ := string(t.storage.Type(ctx, key.Data))
 
-	return &types.RedisData{
+	return (&types.RedisData{
 		Type: types.SString,
 		Data: typ,
-	}, nil
+	}).BuildResponse(), nil
 }

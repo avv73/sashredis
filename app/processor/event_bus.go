@@ -18,7 +18,7 @@ type commandEvent struct {
 }
 
 type responseEvent struct {
-	redisData  *types.RedisData
+	response   *types.CommandResponse
 	blockingCh chan *responseEvent // set to non-nil command/processor to block the client connection, bus should then block on the channel
 	err        error
 }
@@ -36,7 +36,7 @@ func NewEventBus() *CommEventBus {
 	}
 }
 
-func (c *CommEventBus) Execute(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (c *CommEventBus) Execute(ctx context.Context, command *types.Command) (*types.CommandResponse, error) {
 	event := &commandEvent{
 		command:    command,
 		responseCh: make(chan *responseEvent),
@@ -51,24 +51,24 @@ func (c *CommEventBus) Execute(ctx context.Context, command *types.Command) (*ty
 			c.addBlockedConn(ctx, resp.blockingCh)
 			newResp := <-resp.blockingCh
 			log.Warn("client connection unblocked")
-			return newResp.redisData, newResp.err
+			return newResp.response, newResp.err
 		}
 
-		return resp.redisData, resp.err
+		return resp.response, resp.err
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
 }
 
-type ResultCallback func(*types.RedisData, error)
+type ResultCallback func(*types.CommandResponse, error)
 
 func (c *CommEventBus) GetCommand(ctx context.Context) (*types.Command, context.Context, ResultCallback, error) {
 	select {
 	case cmd := <-c.commandCh:
-		return cmd.command, cmd.execCtx, func(rd *types.RedisData, err error) {
+		return cmd.command, cmd.execCtx, func(rd *types.CommandResponse, err error) {
 			event := &responseEvent{
-				redisData: rd,
-				err:       err,
+				response: rd,
+				err:      err,
 			}
 
 			if errors.Is(err, types.ErrBlock) {
@@ -93,8 +93,8 @@ func (c *CommEventBus) UnblockConn(ctx context.Context, data *types.RedisData, e
 
 	delete(c.blockedConn, connId)
 	blockCh <- &responseEvent{
-		redisData: data,
-		err:       err,
+		response: &types.CommandResponse{Data: data},
+		err:      err,
 	}
 	return nil
 }

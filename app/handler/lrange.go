@@ -22,7 +22,7 @@ func NewLrangeHandler(storage RangeStorage) *LrangeHandler {
 	}
 }
 
-func (l *LrangeHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (l *LrangeHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error) {
 	if len(command.Args) != 3 {
 		return nil, errors.New("unexpected number of arguments")
 	}
@@ -46,8 +46,8 @@ func (l *LrangeHandler) HandleCommand(ctx context.Context, command *types.Comman
 		return nil, err
 	}
 
-	return &types.RedisData{
+	return (&types.RedisData{
 		Type:  types.Array,
 		Holds: result,
-	}, nil
+	}).BuildResponse(), nil
 }

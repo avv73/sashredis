@@ -14,14 +14,14 @@ func NewEchoHandler() *EchoHandler {
 	return &EchoHandler{}
 }
 
-func (*EchoHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (*EchoHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error) {
 	if len(command.Args) != 1 {
 		return nil, errors.New("unexpected number of arguments")
 	}
 	message := command.Args[0]
 
-	return &types.RedisData{
+	return (&types.RedisData{
 		Type: types.BString,
 		Data: message.Data,
-	}, nil
+	}).BuildResponse(), nil
 }

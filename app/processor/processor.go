@@ -14,7 +14,7 @@ type EventBusPublisher interface {
 }
 
 type CommandHandler interface {
-	HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error)
+	HandleCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error)
 }
 
 type TransactionController interface {
@@ -52,7 +52,7 @@ func (p *Processor) Start(ctx context.Context) {
 	}()
 }
 
-func (p *Processor) ExecuteCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (p *Processor) ExecuteCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error) {
 	handler, ok := p.handlers[command.Command]
 	if !ok {
 		return nil, fmt.Errorf("command not registered: %s", string(command.Command))

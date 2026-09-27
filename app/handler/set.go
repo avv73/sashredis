@@ -26,7 +26,7 @@ func NewSetHandler(storage SetterStorage) *SetHandler {
 	}
 }
 
-func (s *SetHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (s *SetHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error) {
 	if len(command.Args) < 2 {
 		return nil, errors.New("unexpected number of arguments")
 	}

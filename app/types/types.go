@@ -67,6 +67,11 @@ type Command struct {
 	Args    []*RedisData
 }
 
+type CommandResponse struct {
+	Data      *RedisData
+	ExtraData []byte
+}
+
 type RedisData struct {
 	Type  DataType
 	Data  string
@@ -109,4 +114,8 @@ func (r *RedisData) Clone() *RedisData {
 		new.Holds = append(new.Holds, data.Clone())
 	}
 	return new
+}
+
+func (r *RedisData) BuildResponse() *CommandResponse {
+	return &CommandResponse{Data: r}
 }

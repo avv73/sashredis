@@ -22,7 +22,7 @@ func NewExecHandler(transactionHandler TransactionExecHandler) *ExecHandler {
 	}
 }
 
-func (e *ExecHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.RedisData, error) {
+func (e *ExecHandler) HandleCommand(ctx context.Context, command *types.Command) (*types.CommandResponse, error) {
 	if len(command.Args) > 0 {
 		return nil, errors.New("unexpected number of arguments")
 	}
@@ -32,5 +32,10 @@ func (e *ExecHandler) HandleCommand(ctx context.Context, command *types.Command)
 		return nil, types.ErrExecWithoutMulti
 	}
 
-	return e.transactionHandler.ExecuteTransaction(ctx)
+	result, err := e.transactionHandler.ExecuteTransaction(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.CommandResponse{Data: result}, nil
 }
